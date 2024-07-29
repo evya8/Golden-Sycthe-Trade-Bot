@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 from datetime import datetime, timedelta
+from base.config import DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-to*w3wnwoncwwl#$vvi@bk@2$v^a=rvt_h&_ww@p73&(ghwb@5'
+
+ENCRYPTION_KEY = 'tugjoiTgS92QBV_zO58BsT3wPB_Ozsd2_U-Oi5bUSU8='
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -126,10 +130,20 @@ WSGI_APPLICATION = 'myproj.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'mysql.connector.django',
+        'NAME': DATABASE_NAME,
+        'USER': DATABASE_USER,
+        'PASSWORD': DATABASE_PASSWORD,
+        'HOST': 'localhost',  
+        'PORT': '3306',  
     }
 }
 

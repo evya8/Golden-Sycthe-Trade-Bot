@@ -6,30 +6,40 @@ import pytz
 from datetime import datetime
 import time
 import logging
-from .config import API_KEY, API_SECRET, BASE_URL
+from .models import BotOperation, User
+from django.contrib.auth import get_user_model
 
 # Configure logging
+class DatabaseLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            user = get_user_model().objects.get(username=record.username)
+            log_entry = BotOperation(
+                user=user,
+                operation_type=record.levelname,
+                details=record.getMessage(),
+                timestamp=datetime.fromtimestamp(record.created)
+            )
+            log_entry.save()
+        except User.DoesNotExist:
+            pass
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logger.addHandler(DatabaseLogHandler())
 
-def is_market_open():
-    eastern = pytz.timezone('US/Eastern')
-    now = datetime.now(eastern)
-    market_open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    market_close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    return market_open_time <= now <= market_close_time
-
-def execute_buy_orders(buy_signals, API_KEY, API_SECRET):
+def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
 
     if buy_signals:
         account = trading_client.get_account()
         buying_power = float(account.buying_power)
         total_equity = float(account.equity)
-        logging.info(f"User's buying power: {buying_power}. User's total equity: {account.equity}")
+        logger.info(f"User's buying power: {buying_power}. User's total equity: {account.equity}", extra={'username': user.username})
 
         for stock, date in buy_signals:
             stock = stock.strip()  # Ensure there are no leading/trailing whitespaces
-            logging.info(f"Processing stock: {stock} for date: {date}")
+            logger.info(f"Processing stock: {stock} for date: {date}", extra={'username': user.username})
 
             try:
                 # Check if there is already an open order for the stock
@@ -39,21 +49,21 @@ def execute_buy_orders(buy_signals, API_KEY, API_SECRET):
                                                     side=OrderSide.BUY))
                 
                 if any(order.symbol == stock and order.side == OrderSide.BUY and order.status == OrderStatus.NEW for order in orders):
-                    logging.info(f"There are open orders for {stock}. Skipping...")
+                    logger.info(f"There are open orders for {stock}. Skipping...", extra={'username': user.username})
                     continue
 
                 # Check if there is already an open position for the stock
                 positions = trading_client.get_all_positions()
                 if any(position.symbol == stock for position in positions):
-                    logging.info(f"There is already a position for {stock}. Skipping")
+                    logger.info(f"There is already a position for {stock}. Skipping", extra={'username': user.username})
                     continue
 
                 # Calculate position size
-                amount = round(total_equity * 0.01, 2) # position size to be selected by user
+                amount = round(total_equity * (position_size / 100), 2) # position size to be selected by user
 
                 # Check if there's still enough buying power
-                if buying_power < amount :
-                    logging.info(f"Not enough buying power to continue. Current buying power: {buying_power}")
+                if buying_power < amount:
+                    logger.info(f"Not enough buying power to continue. Current buying power: {buying_power}", extra={'username': user.username})
                     break
 
                 # Generate a unique client order ID
@@ -67,25 +77,22 @@ def execute_buy_orders(buy_signals, API_KEY, API_SECRET):
                                             time_in_force=TimeInForce.DAY,
                                             client_order_id=client_order_id))
                 
-                logging.info(f"Market order (ID-{client_order_id}) was submitted to buy ${amount} worth of {stock}.")
+                logger.info(f"Market order (ID-{client_order_id}) was submitted to buy ${amount} worth of {stock}.", extra={'username': user.username})
                 time.sleep(2)
 
-                         # Get Order Status
-                market_open = is_market_open()
+                # Get Order Status
                 while True:
                     order = trading_client.get_order_by_client_id(client_order_id)
                     if order.status == OrderStatus.FILLED:
-                        logging.info(f"Order for {stock} has been filled.")
+                        logger.info(f"Order for {stock} has been filled.", extra={'username': user.username})
                         break
                     elif order.status in [OrderStatus.CANCELED, OrderStatus.REJECTED]:
-                        logging.warning(f"Order for {stock} was {order.status}.")
+                        logger.warning(f"Order for {stock} was {order.status}.", extra={'username': user.username})
                         break
                     elif order.status in [OrderStatus.ACCEPTED, OrderStatus.PENDING_NEW, OrderStatus.NEW]:
-                        logging.info(f"Order for {stock} awaiting execution : {order.status}")
-                        if not market_open:
-                            break
-                    time.sleep(2) 
-                    
+                        logger.info(f"Order for {stock} awaiting execution: {order.status}", extra={'username': user.username})
+                    time.sleep(2)
 
             except Exception as e:
-                logging.error(f"Error executing buy order for {stock}: {e}")
+                logger.error(f"Error executing buy order for {stock}: {e}", extra={'username': user.username})
+

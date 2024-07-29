@@ -6,17 +6,28 @@ import uuid
 import pytz
 from datetime import datetime
 import time
-from .config import API_KEY, API_SECRET, BASE_URL
+from .models import BotOperation, User
+from django.contrib.auth import get_user_model
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+class DatabaseLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            user = User.objects.get(username=record.username)
+            log_entry = BotOperation(
+                user=user,
+                operation_type=record.levelname,
+                details=record.getMessage(),
+                timestamp=datetime.fromtimestamp(record.created)
+            )
+            log_entry.save()
+        except User.DoesNotExist:
+            pass
 
-def is_market_open():
-    eastern = pytz.timezone('US/Eastern')
-    now = datetime.now(eastern)
-    market_open_time = now.replace(hour=9, minute=30, second=0, microsecond=0)
-    market_close_time = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    return market_open_time <= now <= market_close_time
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logger.addHandler(DatabaseLogHandler())
+
 
 def execute_sell_orders(sell_signals, API_KEY, API_SECRET):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
@@ -61,17 +72,13 @@ def execute_sell_orders(sell_signals, API_KEY, API_SECRET):
                 logging.info(f"Closing position of {stock}, Order ID-{client_order_id}.")
                 time.sleep(3)
 
-                                 # Check Position Status
-                market_open = is_market_open()
+                # Check Position Status
                 while True:
                     positions = trading_client.get_all_positions()
                     position = next((pos for pos in positions if pos.symbol == stock), None)
                 
                     if position is None:
                         logging.info(f"Position for {stock} has been closed")
-                        break
-                    elif not market_open:
-                        logging.info(f"Market is closed, position status for {stock} is still open")
                         break
                     else:
                         logging.info(f"Waiting for position {stock} to close...")

@@ -6,17 +6,38 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 import vectorbt as vbt
-from .config import API_KEY, API_SECRET
+from .models import BotOperation, User
+from django.contrib.auth import get_user_model
+
+# Configure logging
+class DatabaseLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            user = get_user_model().objects.get(username=record.username)
+            log_entry = BotOperation(
+                user=user,
+                operation_type=record.levelname,
+                details=record.getMessage(),
+                timestamp=datetime.fromtimestamp(record.created)
+            )
+            log_entry.save()
+        except User.DoesNotExist:
+            pass
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+logger.addHandler(DatabaseLogHandler())
 
 class StochasticMomentumStrategy:
-    def __init__(self):
+    def __init__(self, user , API_KEY , API_SECRET):
         self.client = StockHistoricalDataClient(API_KEY, API_SECRET)
         self.volume_threshold = 1000000
         self.beta_threshold = 1.5
         self.bid_ask_spread_threshold = 0.05
-        self.filtered_stocks = self.screen_stocks()
+        self.filtered_stocks = self.screen_stocks(user)
+        self.user = user
 
-    def screen_stocks(self):
+    def screen_stocks(self, user):
         # Function to get symbols from the CSV file
         def get_symbols_from_csv():
             df = pd.read_csv('stock_symbols.csv')
@@ -44,7 +65,7 @@ class StochasticMomentumStrategy:
                         'bid_ask_spread': bid_ask_spread
                     }
                 except Exception as e:
-                    print(f"Error fetching data for {symbol}: {e}")
+                    logger.error(f"Error fetching data for {symbol}: {e}", extra={'username': user.username})
                     continue
             return pd.DataFrame.from_dict(data, orient='index')
 
@@ -54,14 +75,14 @@ class StochasticMomentumStrategy:
                 yield lst[i:i + chunk_size]
 
         # Split the list of symbols into chunks of 150
-        symbol_chunks = list(split_list(get_symbols_from_csv(), 150))
+        symbol_chunks = list(split_list(get_symbols_from_csv(), 100))
 
         # Initialize an empty DataFrame to hold the filtered results
         filtered_stocks = pd.DataFrame()
 
         # Process each chunk
         for chunk in symbol_chunks:
-            print(f"Processing chunk: {chunk[:5]}...")  # Print first 5 symbols in the chunk for reference
+            logger.info(f"Processing chunk: {chunk[:5]}...", extra={'username': user.username})  # Print first 5 symbols in the chunk for reference
             chunk_data = fetch_stock_data(chunk)
             
             # Apply screening criteria
@@ -79,10 +100,10 @@ class StochasticMomentumStrategy:
             filtered_stocks = filtered_stocks[~filtered_stocks.index.duplicated()]
 
             # Sort the final DataFrame by average volume in descending order
-            filtered_stocks = filtered_stocks.sort_values(by=['Average_Volume', 'Beta'], ascending=[False, False])
+            filtered_stocks = filtered_stocks.sort_values(by=['average_volume', 'beta'], ascending=[False, False])
 
-        print("Filtered stocks are:")
-        print(filtered_stocks)
+        logger.info("Filtered stocks are:", extra={'username': user.username})
+        logger.info(filtered_stocks.to_string(), extra={'username': user.username})
 
         return filtered_stocks.index.tolist()
 
@@ -146,7 +167,7 @@ class StochasticMomentumStrategy:
         sell_signals = []
         
         for stock in self.filtered_stocks:
-            logging.info(f"Processing stock: {stock}")
+            logger.info(f"Processing stock: {stock}", extra={'username': self.user.username})
 
             try:
                 bars_daily = self.fetch_daily_data(stock, start_date_daily, end_date)
@@ -154,17 +175,17 @@ class StochasticMomentumStrategy:
                 buy_signal, sell_signal = self.calculate_signals(stock, bars_daily, bars_weekly)
 
                 if buy_signal:
-                    logging.info(f"Buy signal for {stock} on {bars_daily.index[-1]}")
+                    logger.info(f"Buy signal for {stock} on {bars_daily.index[-1]}", extra={'username': self.user.username})
                     buy_signals.append((stock, bars_daily.index[-1]))
                 
                 if sell_signal:
-                    logging.info(f"Sell signal for {stock} on {bars_daily.index[-1]}")
+                    logger.info(f"Sell signal for {stock} on {bars_daily.index[-1]}", extra={'username': self.user.username})
                     sell_signals.append((stock, bars_daily.index[-1]))
             
             except Exception as e:
-                logging.error(f"Error processing stock {stock}: {e}")
+                logger.error(f"Error processing stock {stock}: {e}", extra={'username': self.user.username})
         
         if not buy_signals and not sell_signals:
-            logging.info("No buy or sell signals for any stock.")
+            logger.info("No buy or sell signals for any stock.", extra={'username': self.user.username})
         
         return buy_signals, sell_signals
