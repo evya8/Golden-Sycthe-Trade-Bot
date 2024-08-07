@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from cryptography.fernet import Fernet
 from django.conf import settings
-from django.contrib.postgres.fields import JSONField
+import json
 
 
 class TradeSymbols(models.Model):
@@ -24,10 +24,16 @@ class UserSetting(models.Model):
     position_size = models.FloatField(default=0.1,help_text="Percentage of equity to allocate to each position")
     filter_type = models.CharField(max_length=10, default='both', blank=True, null=True)
     filter_sector = models.CharField(max_length=50, default='',blank=True, null=True)
-    filter_exchange = models.CharField(max_length=20, default='',blank=True, null=True)
-    specific_assets = JSONField(default=list, blank=True, null=True)
+    filter_exchange = models.CharField(max_length=50, default='',blank=True, null=True)
+    filter_symbol = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
+
+    def set_filter_symbol(self, lst):
+        self.filter_symbol = json.dumps(lst)
+
+    def get_filter_symbol(self):
+        return json.loads(self.filter_symbol)
 
     @property
     def alpaca_api_key(self):

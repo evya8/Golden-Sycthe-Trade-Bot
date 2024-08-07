@@ -6,7 +6,7 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 import vectorbt as vbt
-from .models import BotOperation, User
+from .models import BotOperation, User , UserSetting, TradeSymbols
 from django.contrib.auth import get_user_model
 
 # Configure logging
@@ -29,19 +29,32 @@ logger = logging.getLogger(__name__)
 logger.addHandler(DatabaseLogHandler())
 
 class StochasticMomentumStrategy:
-    def __init__(self, user , API_KEY , API_SECRET):
+    def __init__(self, user ,record, user_id, API_KEY , API_SECRET):
         self.client = StockHistoricalDataClient(API_KEY, API_SECRET)
         self.volume_threshold = 1000000
         self.beta_threshold = 1.5
         self.bid_ask_spread_threshold = 0.05
         self.filtered_stocks = self.screen_stocks(user)
-        self.user = user
+        self.user = get_user_model().objects.get(username=record.username)
+        self.user_id = get_user_model().objects.get(user_id=record.id)
 
-    def screen_stocks(self, user):
-        # Function to get symbols from the CSV file
-        def get_symbols_from_csv():
-            df = pd.read_csv('stock_symbols.csv')
-            symbols = df['Symbol'].tolist()
+    def screen_stocks(self, user , user_id):
+        def get_symbols(user_id):
+            # Fetch all symbols from the TradeSymbols table
+            symbols = list(TradeSymbols.objects.values_list('symbol', flat=True))
+
+            try:
+                # Get the user-specific settings
+                user_setting = UserSetting.objects.get(user_id=user_id)
+                user_symbols = user_setting.get_filter_symbol()
+                
+                # If the user has specific symbols, use them instead
+                if user_symbols:
+                    symbols = user_symbols
+            except UserSetting.DoesNotExist:
+                # If no user settings exist, use default symbols
+                pass
+
             return symbols
         
         # Function to fetch detailed stock data
@@ -75,7 +88,7 @@ class StochasticMomentumStrategy:
                 yield lst[i:i + chunk_size]
 
         # Split the list of symbols into chunks of 150
-        symbol_chunks = list(split_list(get_symbols_from_csv(), 100))
+        symbol_chunks = list(split_list(get_symbols(), 100))
 
         # Initialize an empty DataFrame to hold the filtered results
         filtered_stocks = pd.DataFrame()

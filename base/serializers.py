@@ -23,7 +23,7 @@ class UserSettingSerializer(serializers.ModelSerializer):
             'filter_type', 
             'filter_sector', 
             'filter_exchange', 
-            'specific_assets'
+            'filter_symbol'
         ]
     
     def validate_position_size(self, value):

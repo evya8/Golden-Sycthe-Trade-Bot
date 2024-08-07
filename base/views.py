@@ -9,6 +9,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import UserSetting, BotOperation , TradeSymbols
 from .serializers import UserSerializer, UserSettingSerializer, BotOperationSerializer
 from .bot import run_bot
+import json
 
 
 class SymbolsView(APIView):
@@ -17,8 +18,10 @@ class SymbolsView(APIView):
         exchange = request.query_params.get('exchange', None)
         type = request.query_params.get('type', None)
 
+        # Fetch all symbols
         symbols_query = TradeSymbols.objects.all()
 
+        # Apply filters if provided
         if sector:
             symbols_query = symbols_query.filter(sector=sector)
         if exchange:
@@ -26,30 +29,52 @@ class SymbolsView(APIView):
         if type:
             symbols_query = symbols_query.filter(type=type)
 
+        # Fetch symbol and company name for the response
         symbols = symbols_query.values('symbol', 'company_name')
 
-        # Optional: Provide a message if filters were applied or if it's the full list
+        # Construct the response message
         if not sector and not exchange and not type:
             message = "All symbols retrieved."
         else:
-            message = f"Filtered symbols based on: " \
-                      f"{'sector: ' + sector if sector else ''} " \
-                      f"{'exchange: ' + exchange if exchange else ''} " \
-                      f"{'type: ' + type if type else ''}".strip()
+            filters = []
+            if sector:
+                filters.append(f"sector: {sector}")
+            if exchange:
+                filters.append(f"exchange: {exchange}")
+            if type:
+                filters.append(f"type: {type}")
+            message = f"Filtered symbols based on: {', '.join(filters)}"
 
-        return Response({'message': message, 'symbols': symbols}, status=status.HTTP_200_OK)
+        return Response({'message': message, 'symbols': list(symbols)}, status=status.HTTP_200_OK)
+    
+    def post(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+            settings = UserSetting.objects.get(user=user)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except UserSetting.DoesNotExist:
+            settings = UserSetting(user=user)
+        
+        settings.filter_sector = request.data.get('filter_sector', '')
+        settings.filter_exchange = request.data.get('filter_exchange', '')
+        settings.filter_symbol = json.dumps(request.data.get('filter_symbol', ''))
+
+        settings.save()
+        return Response({'message': 'Settings saved successfully'}, status=status.HTTP_200_OK)
+
 
 
 class ExchangesView(APIView):
     def get(self, request):
         exchanges = TradeSymbols.objects.values_list('exchange', flat=True).distinct()
-        return Response({'exchanges': exchanges}, status=status.HTTP_200_OK)
+        return Response({'exchanges': list(exchanges)}, status=status.HTTP_200_OK)
 
 
 class SectorsView(APIView):
     def get(self, request):
         sectors = TradeSymbols.objects.values_list('sector', flat=True).distinct()
-        return Response({'sectors': sectors}, status=status.HTTP_200_OK)
+        return Response({'sectors': list(sectors)}, status=status.HTTP_200_OK)
 
 
 class RegisterView(APIView):
@@ -70,14 +95,31 @@ class LoginView(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
         user = authenticate(username=username, password=password)
+        
         if user:
             refresh = RefreshToken.for_user(user)
+            user_data = UserSerializer(user).data
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
+                'user': user_data,
                 'message': 'User logged in successfully'
             }, status=status.HTTP_200_OK)
+        
+        print("Authentication failed for user: ", username)  # Debugging statement
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+
+class LogoutView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
 class UserSettingsView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -93,6 +135,10 @@ class UserSettingsView(APIView):
                 alpaca_api_key='',
                 alpaca_api_secret='',
                 position_size=10,
+                filter_sector='',
+                filter_exchange='',
+                filter_symbol='',
+                filter_type='',  # Add this line if missing
             )
         serializer = UserSettingSerializer(user_settings)
         return Response(serializer.data)
@@ -103,14 +149,24 @@ class UserSettingsView(APIView):
             user_settings = UserSetting.objects.get(user=user)
         except UserSetting.DoesNotExist:
             user_settings = UserSetting(user=user)
-        
-        serializer = UserSettingSerializer(user_settings, data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        # Log the incoming data
+        print("Received data:", request.data)
 
+        data = request.data
+
+        # Ensure arrays are correctly handled for multiselect fields
+        for key in ['filter_sector', 'filter_exchange', 'filter_symbol', 'filter_type']:
+            if key in data and isinstance(data[key], list):
+                data[key] = json.dumps(data[key])
+
+        # Update only the fields provided in the request
+        for key, value in data.items():
+            setattr(user_settings, key, value)
+
+        user_settings.save()
+        serializer = UserSettingSerializer(user_settings)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class BotOperationsView(APIView):
     authentication_classes = [JWTAuthentication]

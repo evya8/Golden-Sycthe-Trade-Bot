@@ -2,7 +2,6 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus, OrderStatus
 import uuid
-import pytz
 from datetime import datetime
 import time
 import logging
