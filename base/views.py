@@ -1,4 +1,5 @@
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User
@@ -11,59 +12,50 @@ from .serializers import UserSerializer, UserSettingSerializer, BotOperationSeri
 from .bot import run_bot
 import json
 
+@api_view(['GET'])
+def filtered_symbols(request):
+    """
+    List all symbols based on the applied filters.
+    """
+    sector = request.GET.get('sector', None)
+    exchange = request.GET.get('exchange', None)
+    type = request.GET.get('type', None)
+
+    symbols_query = TradeSymbols.objects.all()
+
+    if sector:
+        sectors = sector.split(',')
+        symbols_query = symbols_query.filter(sector__in=sectors)
+    if exchange:
+        exchanges = exchange.split(',')
+        symbols_query = symbols_query.filter(exchange__in=exchanges)
+    if type:
+        types = type.split(',')
+        symbols_query = symbols_query.filter(type__in=types)
+
+    symbols = symbols_query.values('symbol', 'company_name')
+
+    filters_applied = []
+    if sector:
+        filters_applied.append(f"sector: {sector}")
+    if exchange:
+        filters_applied.append(f"exchange: {exchange}")
+    if type:
+        filters_applied.append(f"type: {type}")
+    if not filters_applied:
+        message = "All symbols retrieved."
+    else:
+        message = f"Filtered symbols based on: {', '.join(filters_applied)}"
+
+    return Response({'message': message, 'symbols': list(symbols)}, status=status.HTTP_200_OK)
+
+
 
 class SymbolsView(APIView):
     def get(self, request):
-        sector = request.query_params.get('sector', None)
-        exchange = request.query_params.get('exchange', None)
-        type = request.query_params.get('type', None)
-
-        # Fetch all symbols
         symbols_query = TradeSymbols.objects.all()
-
-        # Apply filters if provided
-        if sector:
-            symbols_query = symbols_query.filter(sector=sector)
-        if exchange:
-            symbols_query = symbols_query.filter(exchange=exchange)
-        if type:
-            symbols_query = symbols_query.filter(type=type)
-
-        # Fetch symbol and company name for the response
         symbols = symbols_query.values('symbol', 'company_name')
-
-        # Construct the response message
-        if not sector and not exchange and not type:
-            message = "All symbols retrieved."
-        else:
-            filters = []
-            if sector:
-                filters.append(f"sector: {sector}")
-            if exchange:
-                filters.append(f"exchange: {exchange}")
-            if type:
-                filters.append(f"type: {type}")
-            message = f"Filtered symbols based on: {', '.join(filters)}"
-
-        return Response({'message': message, 'symbols': list(symbols)}, status=status.HTTP_200_OK)
-    
-    def post(self, request, user_id):
-        try:
-            user = User.objects.get(id=user_id)
-            settings = UserSetting.objects.get(user=user)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        except UserSetting.DoesNotExist:
-            settings = UserSetting(user=user)
-        
-        settings.filter_sector = request.data.get('filter_sector', '')
-        settings.filter_exchange = request.data.get('filter_exchange', '')
-        settings.filter_symbol = json.dumps(request.data.get('filter_symbol', ''))
-
-        settings.save()
-        return Response({'message': 'Settings saved successfully'}, status=status.HTTP_200_OK)
-
-
+        return Response({'symbols': list(symbols)}, status=status.HTTP_200_OK)
 
 class ExchangesView(APIView):
     def get(self, request):

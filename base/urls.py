@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RegisterView, LoginView, LogoutView, UserSettingsView, BotOperationsView, RunBotView , SectorsView, SymbolsView, ExchangesView
+from .views import filtered_symbols, RegisterView, LoginView, LogoutView, UserSettingsView, BotOperationsView, RunBotView , SectorsView, SymbolsView, ExchangesView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -19,5 +19,7 @@ urlpatterns = [
     path('api/sectors/', SectorsView.as_view(), name='sectors'),
     path('api/exchanges/', ExchangesView.as_view(), name='exchanges'),
     path('api/symbols/', SymbolsView.as_view(), name='symbols'),
+    path('api/filtered-symbols/', filtered_symbols, name='filtered-symbols'),
+
     
 ]
