@@ -31,13 +31,7 @@ class UserSettingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Position size must be between 0 and 100.")
         return value
 
-    def validate_specific_assets(self, value):
-        if not isinstance(value, list):
-            raise serializers.ValidationError("Specific assets must be a list.")
-        for symbol in value:
-            if not isinstance(symbol, str):
-                raise serializers.ValidationError("Each asset symbol must be a string.")
-        return value
+    
     
     
 class BotOperationSerializer(serializers.ModelSerializer):

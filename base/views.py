@@ -1,5 +1,4 @@
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User
@@ -12,61 +11,61 @@ from .serializers import UserSerializer, UserSettingSerializer, BotOperationSeri
 from .bot import run_bot
 import json
 
-@api_view(['GET'])
-def filtered_symbols(request):
-    """
-    List all symbols based on the applied filters.
-    """
-    sector = request.GET.get('sector', None)
-    exchange = request.GET.get('exchange', None)
-    type = request.GET.get('type', None)
+# @api_view(['GET'])
+# def filtered_symbols(request):
+#     """
+#     List all symbols based on the applied filters.
+#     """
+#     sector = request.GET.get('sector', None)
+#     exchange = request.GET.get('exchange', None)
+#     type = request.GET.get('type', None)
 
-    symbols_query = TradeSymbols.objects.all()
+#     symbols_query = TradeSymbols.objects.all()
 
-    if sector:
-        sectors = sector.split(',')
-        symbols_query = symbols_query.filter(sector__in=sectors)
-    if exchange:
-        exchanges = exchange.split(',')
-        symbols_query = symbols_query.filter(exchange__in=exchanges)
-    if type:
-        types = type.split(',')
-        symbols_query = symbols_query.filter(type__in=types)
+#     if sector:
+#         sectors = sector.split(',')
+#         symbols_query = symbols_query.filter(sector__in=sectors)
+#     if exchange:
+#         exchanges = exchange.split(',')
+#         symbols_query = symbols_query.filter(exchange__in=exchanges)
+#     if type:
+#         types = type.split(',')
+#         symbols_query = symbols_query.filter(type__in=types)
 
-    symbols = symbols_query.values('symbol', 'company_name')
+#     symbols = symbols_query.values('symbol', 'company_name')
 
-    filters_applied = []
-    if sector:
-        filters_applied.append(f"sector: {sector}")
-    if exchange:
-        filters_applied.append(f"exchange: {exchange}")
-    if type:
-        filters_applied.append(f"type: {type}")
-    if not filters_applied:
-        message = "All symbols retrieved."
-    else:
-        message = f"Filtered symbols based on: {', '.join(filters_applied)}"
+#     filters_applied = []
+#     if sector:
+#         filters_applied.append(f"sector: {sector}")
+#     if exchange:
+#         filters_applied.append(f"exchange: {exchange}")
+#     if type:
+#         filters_applied.append(f"type: {type}")
+#     if not filters_applied:
+#         message = "All symbols retrieved."
+#     else:
+#         message = f"Filtered symbols based on: {', '.join(filters_applied)}"
 
-    return Response({'message': message, 'symbols': list(symbols)}, status=status.HTTP_200_OK)
+#     return Response({'message': message, 'symbols': list(symbols)}, status=status.HTTP_200_OK)
 
 
 
 class SymbolsView(APIView):
     def get(self, request):
         symbols_query = TradeSymbols.objects.all()
-        symbols = symbols_query.values('symbol', 'company_name')
+        symbols = symbols_query.values('symbol', 'type', 'exchange', 'company_name', 'sector')
         return Response({'symbols': list(symbols)}, status=status.HTTP_200_OK)
 
-class ExchangesView(APIView):
-    def get(self, request):
-        exchanges = TradeSymbols.objects.values_list('exchange', flat=True).distinct()
-        return Response({'exchanges': list(exchanges)}, status=status.HTTP_200_OK)
+# class ExchangesView(APIView):
+#     def get(self, request):
+#         exchanges = TradeSymbols.objects.values_list('exchange', flat=True).distinct()
+#         return Response({'exchanges': list(exchanges)}, status=status.HTTP_200_OK)
 
 
-class SectorsView(APIView):
-    def get(self, request):
-        sectors = TradeSymbols.objects.values_list('sector', flat=True).distinct()
-        return Response({'sectors': list(sectors)}, status=status.HTTP_200_OK)
+# class SectorsView(APIView):
+#     def get(self, request):
+#         sectors = TradeSymbols.objects.values_list('sector', flat=True).distinct()
+#         return Response({'sectors': list(sectors)}, status=status.HTTP_200_OK)
 
 
 class RegisterView(APIView):
