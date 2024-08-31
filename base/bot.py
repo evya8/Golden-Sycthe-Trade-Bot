@@ -32,9 +32,11 @@ def get_user_settings(user_id):
         user = User.objects.get(id=user_id)
         user_settings = UserSetting.objects.get(user=user)
         return {
-            'api_key': user_settings.alpaca_api_key,
-            'api_secret': user_settings.alpaca_api_secret,  
+            'api_key': user_settings._alpaca_api_key,
+            'api_secret': user_settings._alpaca_api_secret,  
             'position_size': user_settings.position_size,
+            'filter_sector' : user_settings.filter_sector,
+            'filter_symbol' : user_settings.filter_symbol
         }
     except User.DoesNotExist:
         return None
@@ -51,6 +53,8 @@ def run_bot(user_id):
         API_KEY = settings['api_key']
         API_SECRET = settings['api_secret']
         position_size = settings['position_size']
+        filter_sector = settings['filter_sector']
+        filter_symbol = settings['filter_symbol']
 
         strategy = StochasticMomentumStrategy(API_KEY, API_SECRET)
         buy_signals, sell_signals = strategy.check_signals()
