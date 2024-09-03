@@ -19,6 +19,7 @@ class TradeSymbols(models.Model):
 
 class UserSetting(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    bot_active = models.BooleanField(default=False)
     _alpaca_api_key = models.BinaryField(default=b'')  
     _alpaca_api_secret = models.BinaryField(default=b'') 
     position_size = models.FloatField(default=0.1,help_text="Percentage of equity to allocate to each position")
@@ -57,9 +58,11 @@ class UserSetting(models.Model):
 
 class BotOperation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    operation_type = models.CharField(max_length=50)
-    details = models.TextField()
+    stock_symbol = models.CharField(max_length=10)
+    stage = models.CharField(max_length=50)
+    status = models.CharField(max_length=50)
+    reason = models.TextField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.operation_type} - {self.timestamp}"
+        return f"{self.user.username} - {self.stock_symbol} - {self.stage} - {self.status} - {self.timestamp}"

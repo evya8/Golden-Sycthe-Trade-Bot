@@ -32,11 +32,12 @@ def get_user_settings(user_id):
         user = User.objects.get(id=user_id)
         user_settings = UserSetting.objects.get(user=user)
         return {
+            'bot_active': user_settings.bot_active,
             'api_key': user_settings._alpaca_api_key,
             'api_secret': user_settings._alpaca_api_secret,  
             'position_size': user_settings.position_size,
-            'filter_sector' : user_settings.filter_sector,
-            'filter_symbol' : user_settings.filter_symbol
+            'filter_sector': user_settings.filter_sector,
+            'filter_symbol': user_settings.filter_symbol
         }
     except User.DoesNotExist:
         return None
@@ -48,6 +49,10 @@ def run_bot(user_id):
         settings = get_user_settings(user_id)
         if settings is None:
             logging.error(f"User settings for user ID {user_id} not found.")
+            return
+
+        if not settings['bot_active']:
+            logging.info(f"Bot for user ID {user_id} is deactivated.")
             return
 
         API_KEY = settings['api_key']
@@ -71,6 +76,38 @@ def run_bot(user_id):
     except Exception as e:
         logging.error(f"An error occurred while running the trading bot: {e}")
 
+def deactivate_bot(user_id):
+    # Add logic to stop the bot if needed (e.g., canceling orders, stopping scheduled tasks, etc.)
+    logging.info(f"Deactivation logic for bot of user ID {user_id} executed.")
+    # Implement any specific deactivation procedures here
+
+def toggle_bot(user_id):
+    try:
+        user = User.objects.get(id=user_id)
+        user_settings = UserSetting.objects.get(user=user)
+
+        if user_settings.bot_active:
+            # Deactivate the bot
+            deactivate_bot(user_id)
+            user_settings.bot_active = False
+            logging.info(f"Bot for user ID {user_id} has been deactivated.")
+        else:
+            # Activate the bot
+            run_bot(user_id)
+            user_settings.bot_active = True
+            logging.info(f"Bot for user ID {user_id} has been activated.")
+        
+        user_settings.save()
+    except User.DoesNotExist:
+        logging.error(f"User with ID {user_id} does not exist.")
+        raise
+    except UserSetting.DoesNotExist:
+        logging.error(f"User settings for user ID {user_id} do not exist.")
+        raise
+    except Exception as e:
+        logging.error(f"An error occurred while toggling the bot for user ID {user_id}: {e}")
+        raise
+
 def schedule_bot(user_id):
     eastern = pytz.timezone('US/Eastern')
     schedule_time = "10:15"
@@ -82,6 +119,11 @@ def schedule_bot(user_id):
 
         # Run the bot only on weekdays (Monday to Friday)
         if current_time == schedule_time and current_day < 5:
-            run_bot(user_id)
+            # Check if the bot is active before running it
+            user_settings = get_user_settings(user_id)
+            if user_settings and user_settings['bot_active']:
+                run_bot(user_id)
+            else:
+                logging.info(f"Bot for user ID {user_id} is deactivated.")
 
         time.sleep(60)

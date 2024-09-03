@@ -5,7 +5,7 @@ from .models import UserSetting, BotOperation
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['username', 'password']
+        fields = ['username', 'password','id', 'first_name', 'last_name', 'email']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -19,6 +19,7 @@ class UserSettingSerializer(serializers.ModelSerializer):
         fields = [
             'alpaca_api_key', 
             'alpaca_api_secret', 
+            'bot_active',
             'position_size', 
             'filter_type', 
             'filter_sector', 
@@ -37,4 +38,4 @@ class UserSettingSerializer(serializers.ModelSerializer):
 class BotOperationSerializer(serializers.ModelSerializer):
     class Meta:
         model = BotOperation
-        fields = '__all__'
+        fields = ['id', 'user', 'stock_symbol', 'stage', 'status', 'reason', 'timestamp']

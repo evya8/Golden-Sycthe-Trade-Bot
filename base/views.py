@@ -8,65 +8,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import UserSetting, BotOperation , TradeSymbols
 from .serializers import UserSerializer, UserSettingSerializer, BotOperationSerializer
-from .bot import run_bot
+from .bot import toggle_bot  
 import json
-
-# @api_view(['GET'])
-# def filtered_symbols(request):
-#     """
-#     List all symbols based on the applied filters.
-#     """
-#     sector = request.GET.get('sector', None)
-#     exchange = request.GET.get('exchange', None)
-#     type = request.GET.get('type', None)
-
-#     symbols_query = TradeSymbols.objects.all()
-
-#     if sector:
-#         sectors = sector.split(',')
-#         symbols_query = symbols_query.filter(sector__in=sectors)
-#     if exchange:
-#         exchanges = exchange.split(',')
-#         symbols_query = symbols_query.filter(exchange__in=exchanges)
-#     if type:
-#         types = type.split(',')
-#         symbols_query = symbols_query.filter(type__in=types)
-
-#     symbols = symbols_query.values('symbol', 'company_name')
-
-#     filters_applied = []
-#     if sector:
-#         filters_applied.append(f"sector: {sector}")
-#     if exchange:
-#         filters_applied.append(f"exchange: {exchange}")
-#     if type:
-#         filters_applied.append(f"type: {type}")
-#     if not filters_applied:
-#         message = "All symbols retrieved."
-#     else:
-#         message = f"Filtered symbols based on: {', '.join(filters_applied)}"
-
-#     return Response({'message': message, 'symbols': list(symbols)}, status=status.HTTP_200_OK)
-
-
 
 class SymbolsView(APIView):
     def get(self, request):
         symbols_query = TradeSymbols.objects.all()
         symbols = symbols_query.values('symbol', 'type', 'exchange', 'company_name', 'sector')
         return Response({'symbols': list(symbols)}, status=status.HTTP_200_OK)
-
-# class ExchangesView(APIView):
-#     def get(self, request):
-#         exchanges = TradeSymbols.objects.values_list('exchange', flat=True).distinct()
-#         return Response({'exchanges': list(exchanges)}, status=status.HTTP_200_OK)
-
-
-# class SectorsView(APIView):
-#     def get(self, request):
-#         sectors = TradeSymbols.objects.values_list('sector', flat=True).distinct()
-#         return Response({'sectors': list(sectors)}, status=status.HTTP_200_OK)
-
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -127,9 +76,9 @@ class UserSettingsView(APIView):
                 alpaca_api_secret='',
                 position_size=10,
                 filter_sector='',
-                filter_exchange='',
                 filter_symbol='',
-                filter_type='',  # Add this line if missing
+                bot_active=False
+                
             )
         serializer = UserSettingSerializer(user_settings)
         return Response(serializer.data)
@@ -147,7 +96,7 @@ class UserSettingsView(APIView):
         data = request.data
 
         # Ensure arrays are correctly handled for multiselect fields
-        for key in ['filter_sector', 'filter_exchange', 'filter_symbol', 'filter_type']:
+        for key in ['filter_sector', 'filter_symbol']:
             if key in data and isinstance(data[key], list):
                 data[key] = json.dumps(data[key])
 
@@ -168,14 +117,17 @@ class BotOperationsView(APIView):
         serializer = BotOperationSerializer(operations, many=True)
         return Response(serializer.data)
     
-class RunBotView(APIView):
+class ToggleBotView(APIView):  # Updated view to handle toggling the bot
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            
-            run_bot()  
-            return Response({'message': 'Bot run initiated successfully.'}, status=status.HTTP_200_OK)
+            user_id = request.data.get('user_id')  # Get user_id from the request data
+            if not user_id:
+                return Response({'error': 'User ID not provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+            toggle_bot(user_id)  # Call toggle_bot instead of run_bot
+            return Response({'message': 'Bot activation state toggled successfully.'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

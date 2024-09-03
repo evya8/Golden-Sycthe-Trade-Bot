@@ -1,11 +1,10 @@
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest, ClosePositionRequest
+from alpaca.trading.requests import GetOrdersRequest, ClosePositionRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus, OrderStatus
 import logging
 import uuid
-import pytz
-from datetime import datetime
 import time
+from datetime import datetime
 from .models import BotOperation, User
 from django.contrib.auth import get_user_model
 
@@ -13,11 +12,13 @@ from django.contrib.auth import get_user_model
 class DatabaseLogHandler(logging.Handler):
     def emit(self, record):
         try:
-            user = User.objects.get(username=record.username)
+            user = get_user_model().objects.get(username=record.username)
             log_entry = BotOperation(
                 user=user,
-                operation_type=record.levelname,
-                details=record.getMessage(),
+                stock_symbol=record.stock_symbol,  # Assuming stock symbol is added to the log record
+                stage=record.stage,  # Assuming stage is added to the log record
+                status=record.levelname,
+                reason=record.getMessage(),
                 timestamp=datetime.fromtimestamp(record.created)
             )
             log_entry.save()
@@ -28,25 +29,24 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 logger.addHandler(DatabaseLogHandler())
 
-
-def execute_sell_orders(sell_signals, API_KEY, API_SECRET):
+def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
 
     if sell_signals:
         for stock, date in sell_signals:
-            stock = stock.strip()  # Ensure there are no leading/trailing whitespaces
-            logging.info(f"Processing stock: {stock} for date: {date}")
+            stock = stock.strip()
+            logger.info(f"Processing stock: {stock} for date: {date}", extra={'username': user.username})
 
             try:
                 # Check if there is already an open position for the stock
                 positions = trading_client.get_all_positions()
                 position = next((pos for pos in positions if pos.symbol == stock), None)
-                
+
                 if position is None:
-                    logging.info(f"No position found for {stock}. Skipping...")
+                    logger.info(f"No position found for {stock}. Skipping...", extra={'username': user.username})
                     continue
 
-                logging.info(f"Found a position of {position.qty} for {stock}")
+                logger.info(f"Found a position of {position.qty} for {stock}", extra={'username': user.username})
 
                 # Check if there is already an open order for the stock
                 orders = trading_client.get_orders(filter=GetOrdersRequest(
@@ -55,7 +55,7 @@ def execute_sell_orders(sell_signals, API_KEY, API_SECRET):
                                                    side=OrderSide.SELL))
                     
                 if any(order.symbol == stock and order.side == OrderSide.SELL and order.status in [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PENDING_NEW] for order in orders):
-                    logging.info(f"There are open orders for {stock}. Skipping...")
+                    logger.info(f"There are open orders for {stock}. Skipping...", extra={'username': user.username})
                     continue
 
                 # Generate a unique client order ID
@@ -63,26 +63,54 @@ def execute_sell_orders(sell_signals, API_KEY, API_SECRET):
 
                 # Submit a market order to sell
                 trading_client.close_position(
-                                            symbol_or_asset_id = stock,
-                                            close_options = ClosePositionRequest(
-                                            percentage = "100",
-                                            time_in_force=TimeInForce.DAY,
-                                            client_order_id = client_order_id))
-                    
-                logging.info(f"Closing position of {stock}, Order ID-{client_order_id}.")
+                    symbol_or_asset_id=stock,
+                    close_options=ClosePositionRequest(
+                        percentage="100",
+                        time_in_force=TimeInForce.DAY,
+                        client_order_id=client_order_id)
+                )
+
+                logger.info(f"Closing position of {stock}, Order ID-{client_order_id}.", extra={'username': user.username})
+                # Log the order submission
+                BotOperation.objects.create(
+                    user=user,
+                    stock_symbol=stock,
+                    stage="Order Confirmation",  # Stage: Order Confirmation
+                    status="Submitted",  # Status: Order submitted
+                    reason=f"Sell order submitted for {stock}",
+                    timestamp=datetime.now()
+                )
                 time.sleep(3)
 
                 # Check Position Status
                 while True:
                     positions = trading_client.get_all_positions()
                     position = next((pos for pos in positions if pos.symbol == stock), None)
-                
+
                     if position is None:
-                        logging.info(f"Position for {stock} has been closed")
+                        logger.info(f"Position for {stock} has been closed", extra={'username': user.username})
+                        # Log the order fulfillment
+                        BotOperation.objects.create(
+                            user=user,
+                            stock_symbol=stock,
+                            stage="Order Confirmation",  # Stage: Order Confirmation
+                            status="Filled",  # Status: Order filled
+                            reason=f"Sell order filled for {stock}",
+                            timestamp=datetime.now()
+                        )
                         break
                     else:
-                        logging.info(f"Waiting for position {stock} to close...")
+                        logger.info(f"Waiting for position {stock} to close...", extra={'username': user.username})
                         time.sleep(2)
-                    
+
             except Exception as e:
-                logging.error(f"Error executing sell order for {stock}: {e}")
+                logger.error(f"Error executing sell order for {stock}: {e}", extra={'username': user.username})
+                # Log any errors during the order execution
+                BotOperation.objects.create(
+                    user=user,
+                    stock_symbol=stock,
+                    stage="Order Confirmation",  # Stage: Order Confirmation
+                    status="Error",  # Status: Error occurred
+                    reason=f"Error executing sell order for {stock}: {e}",
+                    timestamp=datetime.now()
+                )
