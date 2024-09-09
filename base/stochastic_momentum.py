@@ -6,62 +6,40 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 import vectorbt as vbt
-from .models import BotOperation, User , UserSetting, TradeSymbols
-from django.contrib.auth import get_user_model
+from .models import BotOperation, TradeSymbols
 
 # Configure logging
-class DatabaseLogHandler(logging.Handler):
-    def emit(self, record):
-        try:
-            user = get_user_model().objects.get(username=record.username)
-            log_entry = BotOperation(
-                user=user,
-                operation_type=record.levelname,
-                details=record.getMessage(),
-                timestamp=datetime.fromtimestamp(record.created)
-            )
-            log_entry.save()
-        except User.DoesNotExist:
-            pass
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logger.addHandler(DatabaseLogHandler())
 
 class StochasticMomentumStrategy:
-    def __init__(self, user, API_KEY, API_SECRET):
+    def __init__(self, user, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
         self.client = StockHistoricalDataClient(API_KEY, API_SECRET)
         self.volume_threshold = 1000000
         self.beta_threshold = 1.5
         self.bid_ask_spread_threshold = 0.05
-        self.user = user  # Ensure user is passed and stored
+        self.user = user
+        self.filter_symbol = filter_symbol if isinstance(filter_symbol, list) else []
+        self.filter_sector = filter_sector if isinstance(filter_sector, list) else []
         self.filtered_stocks = self.screen_stocks()
 
     def screen_stocks(self):
+        # If filter_symbol or filter_sector is provided, log them and send them directly to indicators
+        if self.filter_symbol:
+            logger.info(f"Using provided symbols: {self.filter_symbol}", extra={'username': self.user.username})
+            self.log_user_filtered_stocks(self.filter_symbol, "User Selected Symbols")
+            return self.filter_symbol
+
+        if self.filter_sector:
+            logger.info(f"Using symbols from provided sector: {self.filter_sector}", extra={'username': self.user.username})
+            symbols_in_sector = list(TradeSymbols.objects.filter(sector=self.filter_sector).values_list('symbol', flat=True))
+            self.log_user_filtered_stocks(symbols_in_sector, "User Selected Sectors")
+            return symbols_in_sector
+
+        # If no filters are provided, perform the screening
         def get_symbols():
-            # Fetch symbols from the database
             symbols = list(TradeSymbols.objects.values_list('symbol', flat=True))
-            try:
-                # Get the user's settings
-                user_setting = UserSetting.objects.get(user=self.user)
-
-                # Check if user has set specific symbols
-                user_symbols = user_setting.get_filter_symbol()
-                if user_symbols:
-                    logger.info(f"Using user-selected symbols: {user_symbols}", extra={'username': self.user.username})
-                    return user_symbols
-
-                # Check if user has set a sector filter
-                user_sector = user_setting.filter_sector
-                if user_sector:
-                    logger.info(f"Using symbols from user-selected sector: {user_sector}", extra={'username': self.user.username})
-                    symbols_in_sector = list(TradeSymbols.objects.filter(sector=user_sector).values_list('symbol', flat=True))
-                    return symbols_in_sector
-
-            except UserSetting.DoesNotExist:
-                pass
-
-            # If no user filters, return default symbols
             return symbols
 
         def fetch_stock_data(symbols):
@@ -84,8 +62,7 @@ class StochasticMomentumStrategy:
                     logger.error(f"Error fetching data for {symbol}: {e}", extra={'username': self.user.username})
                     continue
             return pd.DataFrame.from_dict(data, orient='index')
-        
-         # Function to split list into chunks
+
         def split_list(lst, chunk_size):
             for i in range(0, len(lst), chunk_size):
                 yield lst[i:i + chunk_size]
@@ -109,15 +86,83 @@ class StochasticMomentumStrategy:
             BotOperation.objects.create(
                 user=self.user,
                 stock_symbol=stock,
-                stage="First Screen",  # Stage: First Screen
-                status="Passed",  # Status: Passed the screening
+                stage="First Screen",
+                status="Passed",
                 reason="Passed initial screening",
                 timestamp=datetime.now()
             )
 
+        logger.info("Filtered stocks:", extra={'username': self.user.username})
+        logger.info(filtered_stocks.to_string(), extra={'username': self.user.username})
+
         return filtered_stocks.index.tolist()
 
-    def check_signals(self):
+
+    def log_user_filtered_stocks(self, stocks, reason):
+        """Logs the stocks chosen by the user with the provided reason."""
+        for stock in stocks:
+            BotOperation.objects.create(
+                user=self.user,
+                stock_symbol=stock,
+                stage="First Screen",
+                status="Passed",
+                reason=reason,
+                timestamp=datetime.now()
+            )
+        logger.info(f"User-chosen stocks ({reason}): {stocks}", extra={'username': self.user.username})
+
+    def fetch_daily_data(self, stock: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        """Fetch daily stock data."""
+        request_params = StockBarsRequest(
+            symbol_or_symbols=stock,
+            timeframe=TimeFrame.Day,
+            start=start_date,
+            end=end_date,
+            adjustment='all'
+        )
+        bars_daily = self.client.get_stock_bars(request_params).df.reset_index(level='symbol', drop=True)
+        return bars_daily
+
+    def fetch_weekly_data(self, stock: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+        """Fetch weekly stock data."""
+        request_params = StockBarsRequest(
+            symbol_or_symbols=stock,
+            timeframe=TimeFrame.Week,
+            start=start_date,
+            end=end_date,
+            adjustment='all'
+        )
+        bars_weekly = self.client.get_stock_bars(request_params).df.reset_index(level='symbol', drop=True)
+        return bars_weekly
+
+    def calculate_signals(self, stock: str, bars_daily: pd.DataFrame, bars_weekly: pd.DataFrame) -> tuple[bool, bool]:
+        """Calculate buy and sell signals based on Stochastic Oscillator."""
+        stoch = vbt.STOCH.run(
+            high=bars_weekly['high'], 
+            low=bars_weekly['low'], 
+            close=bars_weekly['close'],
+            k_window=10, 
+            d_window=3, 
+            d_ewm=False  
+        )
+
+        stoch_k = stoch.percent_k
+        stoch_d = stoch.percent_d
+        
+        stoch_buy_signal = (stoch_k > 32) & (stoch_k > stoch_d)
+        stoch_buy_signal = stoch_buy_signal.reindex(bars_daily.index, method='ffill').fillna(False).infer_objects(copy=False)
+        
+        stoch_sell_signal = (stoch_k < 80) & (stoch_k < stoch_d)
+        stoch_sell_signal = stoch_sell_signal.reindex(bars_daily.index, method='ffill').fillna(False).infer_objects(copy=False)
+
+        prev_day = bars_daily.index[-1]
+        buy_signal = stoch_buy_signal.loc[prev_day]
+        sell_signal = stoch_sell_signal.loc[prev_day]
+
+        return buy_signal, sell_signal
+
+    def check_signals(self) -> tuple[list[tuple[str, datetime]], list[tuple[str, datetime]]]:
+        """Check buy and sell signals for the filtered stocks."""
         start_date_daily = datetime.now() - timedelta(days=200)
         start_date_weekly = datetime.now() - timedelta(days=200)
         end_date = datetime.now() - timedelta(days=1)
@@ -140,7 +185,7 @@ class StochasticMomentumStrategy:
                         user=self.user,
                         stock_symbol=stock,
                         stage="Indicator",  # Stage: Indicator
-                        status="Buy Signal",  # Status: Buy signal generated
+                        status="Passed",  
                         reason="Stochastic Oscillator buy signal generated",
                         timestamp=datetime.now()
                     )
@@ -152,8 +197,20 @@ class StochasticMomentumStrategy:
                         user=self.user,
                         stock_symbol=stock,
                         stage="Indicator",  # Stage: Indicator
-                        status="Sell Signal",  # Status: Sell signal generated
+                        status="Passed",  
                         reason="Stochastic Oscillator sell signal generated",
+                        timestamp=datetime.now()
+                    )
+
+                # Log if no buy or sell signal is generated
+                if not buy_signal and not sell_signal:
+                    logger.info(f"No signals generated for {stock}", extra={'username': self.user.username})
+                    BotOperation.objects.create(
+                        user=self.user,
+                        stock_symbol=stock,
+                        stage="Indicator",
+                        status="Failed",  
+                        reason="No buy/sell signal generated",
                         timestamp=datetime.now()
                     )
 

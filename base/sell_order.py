@@ -5,29 +5,11 @@ import logging
 import uuid
 import time
 from datetime import datetime
-from .models import BotOperation, User
-from django.contrib.auth import get_user_model
+from .models import BotOperation
 
 # Configure logging
-class DatabaseLogHandler(logging.Handler):
-    def emit(self, record):
-        try:
-            user = get_user_model().objects.get(username=record.username)
-            log_entry = BotOperation(
-                user=user,
-                stock_symbol=record.stock_symbol,  # Assuming stock symbol is added to the log record
-                stage=record.stage,  # Assuming stage is added to the log record
-                status=record.levelname,
-                reason=record.getMessage(),
-                timestamp=datetime.fromtimestamp(record.created)
-            )
-            log_entry.save()
-        except User.DoesNotExist:
-            pass
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logger.addHandler(DatabaseLogHandler())
 
 def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
@@ -44,6 +26,15 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
 
                 if position is None:
                     logger.info(f"No position found for {stock}. Skipping...", extra={'username': user.username})
+                    # Log the failure due to no position
+                    BotOperation.objects.create(
+                    user=user,
+                    stock_symbol=stock,
+                    stage="Order Status", 
+                    status="Failed",  
+                    reason=f"There is no position for {stock}",
+                    timestamp=datetime.now()
+                    )
                     continue
 
                 logger.info(f"Found a position of {position.qty} for {stock}", extra={'username': user.username})
@@ -56,6 +47,15 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                     
                 if any(order.symbol == stock and order.side == OrderSide.SELL and order.status in [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PENDING_NEW] for order in orders):
                     logger.info(f"There are open orders for {stock}. Skipping...", extra={'username': user.username})
+                    # Log the failure due to open orders
+                    BotOperation.objects.create(
+                    user=user,
+                    stock_symbol=stock,
+                    stage="Order Status", 
+                    status="Failed",  
+                    reason=f"There is already open sell order for {stock}",
+                    timestamp=datetime.now()
+                    )
                     continue
 
                 # Generate a unique client order ID
@@ -75,8 +75,8 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                 BotOperation.objects.create(
                     user=user,
                     stock_symbol=stock,
-                    stage="Order Confirmation",  # Stage: Order Confirmation
-                    status="Submitted",  # Status: Order submitted
+                    stage="Order Status", 
+                    status="Passed",  
                     reason=f"Sell order submitted for {stock}",
                     timestamp=datetime.now()
                 )
@@ -110,7 +110,7 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                     user=user,
                     stock_symbol=stock,
                     stage="Order Confirmation",  # Stage: Order Confirmation
-                    status="Error",  # Status: Error occurred
+                    status="Failed", 
                     reason=f"Error executing sell order for {stock}: {e}",
                     timestamp=datetime.now()
                 )

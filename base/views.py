@@ -1,22 +1,22 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import UserSetting, BotOperation , TradeSymbols
+from .models import UserSetting, BotOperation, TradeSymbols
 from .serializers import UserSerializer, UserSettingSerializer, BotOperationSerializer
-from .bot import toggle_bot  
+from .bot import toggle_bot
 import json
 
+# Symbols View
 class SymbolsView(APIView):
     def get(self, request):
         symbols_query = TradeSymbols.objects.all()
         symbols = symbols_query.values('symbol', 'type', 'exchange', 'company_name', 'sector')
         return Response({'symbols': list(symbols)}, status=status.HTTP_200_OK)
 
+# Registration View
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
@@ -27,40 +27,32 @@ class RegisterView(APIView):
             return Response({'message': 'User created successfully'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]  # Ensure the user is authenticated
 
-class LoginView(APIView):
-    permission_classes = [AllowAny]
+    def get(self, request):
+        user = request.user  # Get the authenticated user from the request
+        serializer = UserSerializer(user)  # Serialize the user object
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        user = authenticate(username=username, password=password)
-        
-        if user:
-            refresh = RefreshToken.for_user(user)
-            user_data = UserSerializer(user).data
-            return Response({
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'user': user_data,
-                'message': 'User logged in successfully'
-            }, status=status.HTTP_200_OK)
-        
-        print("Authentication failed for user: ", username)  # Debugging statement
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
+# Updated Logout View
 class LogoutView(APIView):
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         try:
-            refresh_token = request.data["refresh"]
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            refresh_token = request.data.get("refresh")
+            if not refresh_token:
+                return Response({'error': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+            token = RefreshToken(refresh_token)
+            token.blacklist()  # Blacklist the refresh token
+            return Response({'message': 'Logout successful'}, status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+# User Settings View
 class UserSettingsView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -72,14 +64,14 @@ class UserSettingsView(APIView):
         except UserSetting.DoesNotExist:
             user_settings = UserSetting.objects.create(
                 user=user,
-                alpaca_api_key='',
-                alpaca_api_secret='',
+                alpaca_api_key='',  # Empty string for new users
+                alpaca_api_secret='',  # Empty string for new users
                 position_size=10,
                 filter_sector='',
                 filter_symbol='',
                 bot_active=False
-                
             )
+        # Use the serializer to automatically handle decryption via the model properties
         serializer = UserSettingSerializer(user_settings)
         return Response(serializer.data)
 
@@ -90,24 +82,35 @@ class UserSettingsView(APIView):
         except UserSetting.DoesNotExist:
             user_settings = UserSetting(user=user)
 
-        # Log the incoming data
-        print("Received data:", request.data)
-
         data = request.data
 
-        # Ensure arrays are correctly handled for multiselect fields
+        # Log the incoming data for debugging
+        print("Received data:", data)
+
+        # Handle filter fields (arrays), convert to JSON if necessary
         for key in ['filter_sector', 'filter_symbol']:
             if key in data and isinstance(data[key], list):
                 data[key] = json.dumps(data[key])
 
         # Update only the fields provided in the request
         for key, value in data.items():
-            setattr(user_settings, key, value)
+            if key in ['alpaca_api_key', 'alpaca_api_secret']:
+                # Check if API key and secret are present before setting
+                if value:
+                    setattr(user_settings, key, value)
+                else:
+                    print(f"Missing {key} in request data")
+            else:
+                setattr(user_settings, key, value)
 
+        # Save updated user settings
         user_settings.save()
+
+        # Return the updated settings with decrypted API keys via the serializer
         serializer = UserSettingSerializer(user_settings)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
+    
+# Bot Operations View
 class BotOperationsView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -116,8 +119,9 @@ class BotOperationsView(APIView):
         operations = BotOperation.objects.filter(user=request.user)
         serializer = BotOperationSerializer(operations, many=True)
         return Response(serializer.data)
-    
-class ToggleBotView(APIView):  # Updated view to handle toggling the bot
+
+# Toggle Bot View
+class ToggleBotView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
