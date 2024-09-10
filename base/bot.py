@@ -2,13 +2,21 @@ import logging
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 import time
-from datetime import datetime
+from django.utils import timezone
 import traceback
 import json
+
+# Subclass logging.Formatter to use UTC
+class UTCFormatter(logging.Formatter):
+    converter = time.gmtime  # Force UTC for log timestamps
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Update the logger to use UTCFormatter
+for handler in logger.handlers:
+    handler.setFormatter(UTCFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 # Dictionary to hold user locks
 user_locks = {}
@@ -29,7 +37,6 @@ def get_user_settings(user_id):
         filter_symbol = json.loads(user_settings.filter_symbol) if user_settings.filter_symbol else []
         filter_sector = json.loads(user_settings.filter_sector) if user_settings.filter_sector else []
 
-
         logger.info(f"User settings fetched for user ID {user_id}")
         return {
             'bot_active': user_settings.bot_active,
@@ -48,7 +55,7 @@ def get_user_settings(user_id):
     except Exception as e:
         logger.error(f"Error fetching user settings for user {user_id}: {e}")
         return None
-    
+
 def validate_sectors(sectors):
     """Validate sectors to ensure they are a list of non-empty strings."""
     if isinstance(sectors, list):
@@ -60,7 +67,7 @@ def validate_sectors(sectors):
     else:
         logger.error(f"Expected list of sectors, got {type(sectors)}")
         return []
-    
+
 def validate_symbols(symbols):
     if isinstance(symbols, list):
         valid_symbols = [symbol for symbol in symbols if isinstance(symbol, str) and symbol.isalnum()]
@@ -109,9 +116,8 @@ def run_bot(user_id):
                 return
 
             from .stochastic_momentum import StochasticMomentumStrategy  # Import moved inside the function
-            from django.contrib.auth.models import User  # Import moved inside the function
             strategy = StochasticMomentumStrategy(
-                user=User.objects.get(id=user_id),
+                user_id=user_id,
                 API_KEY=API_KEY,
                 API_SECRET=API_SECRET,
                 filter_symbol=valid_symbols,
@@ -134,7 +140,7 @@ def run_bot(user_id):
                 logger.info(f"Executing sell orders for {len(sell_signals)} stocks for user {user_id}.")
                 execute_sell_orders(sell_signals, API_KEY, API_SECRET)
 
-            logger.info(f"Bot run completed successfully for user ID {user_id} at {datetime.now()}.")
+            logger.info(f"Bot run completed successfully for user ID {user_id} at {timezone.now()}.")
 
         except Exception as e:
             logger.error(f"An error occurred while running the trading bot for user ID {user_id}: {str(e)}")
@@ -143,7 +149,7 @@ def run_bot(user_id):
 def deactivate_bot(user_id):
     logger.info(f"Deactivation logic for bot of user ID {user_id} executed.")
     # Implement any specific deactivation procedures here
-
+    
 def toggle_bot(user_id):
     try:
         from django.contrib.auth.models import User  # Import moved inside the function
@@ -172,20 +178,16 @@ def toggle_bot(user_id):
         logger.error(f"Error details: {traceback.format_exc()}")
 
 def run_bot_for_all_users():
+    logger.info(f"Attempting to run bots at {timezone.now()} (Server Time)")
     try:
         from .models import UserSetting  # Import moved inside the function
         active_users = UserSetting.objects.filter(bot_active=True).values_list('user_id', flat=True)
-        threads = []
-
+        
         logger.info(f"Running bot for {len(active_users)} active users.")
         
         for user_id in active_users:
-            t = threading.Thread(target=run_bot, args=(user_id,))
-            t.start()
-            threads.append(t)
+            run_bot(user_id)  # Avoid threading, run bots sequentially to prevent overlap
 
-        for t in threads:
-            t.join()
     except Exception as e:
         logger.error(f"Error in running bots for users: {e}")
         logger.error(f"Error details: {traceback.format_exc()}")
@@ -202,7 +204,9 @@ def schedule_all_bots():
         day_of_week='mon-fri', 
         hour=10, 
         minute=15, 
-        misfire_grace_time=7200  # Allow the job to be run within 2 hours of the scheduled time
+        misfire_grace_time=7200,  # Allow the job to be run within 2 hours of the scheduled time
+        max_instances=1,  # Only one instance should run at a time
+        coalesce=True  # Merge missed executions to avoid overlapping runs
     )    
     logger.info("Scheduler started. Bots will run at 10:15 AM Monday to Friday.")
     
@@ -216,6 +220,3 @@ def schedule_all_bots():
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown(wait=False)
         logger.info("Scheduler shut down.")
-
-if __name__ == "__main__":
-    threading.Thread(target=schedule_all_bots).start()

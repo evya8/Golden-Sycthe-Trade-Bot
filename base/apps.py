@@ -1,13 +1,13 @@
 from django.apps import AppConfig
 import threading
 import logging
-from .bot import schedule_all_bots 
+from .bot import schedule_all_bots
 
 logger = logging.getLogger(__name__)
 
 class BaseConfig(AppConfig):
     name = 'base'
-    scheduler_started = False
+    scheduler_started = False  # Ensure scheduler is only started once
 
     def ready(self):
         # Prevent multiple threads from being started on multiple calls to ready()

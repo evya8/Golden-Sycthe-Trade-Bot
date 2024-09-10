@@ -1,15 +1,23 @@
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus, OrderStatus
+from django.utils import timezone
 import uuid
-from datetime import datetime
 import time
 import logging
 from .models import BotOperation
 
+# Subclass logging.Formatter to use UTC
+class UTCFormatter(logging.Formatter):
+    converter = time.gmtime  # Force UTC for log timestamps
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Update the logger to use UTCFormatter
+for handler in logger.handlers:
+    handler.setFormatter(UTCFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
@@ -39,7 +47,7 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                         stage="Order Status",
                         status="Failed",
                         reason=f"There is already open buy order for {stock}",
-                        timestamp=datetime.now()
+                        timestamp=timezone.now()
                     )
                     continue
 
@@ -53,7 +61,7 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                         stage="Order Status",
                         status="Failed",
                         reason=f"There is already a position for {stock}",
-                        timestamp=datetime.now()
+                        timestamp=timezone.now()
                     )
                     continue
 
@@ -68,7 +76,7 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                         stage="Order Status",
                         status="Failed",
                         reason=f"Not enough buying power for {stock}",
-                        timestamp=datetime.now()
+                        timestamp=timezone.now()
                     )
                     break
 
@@ -89,7 +97,7 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                     stage="Order Status",  
                     status="Passed", 
                     reason=f"Buy order submitted for {stock}",
-                    timestamp=datetime.now()
+                    timestamp=timezone.now()
                 )
                 time.sleep(2)
 
@@ -104,7 +112,7 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Passed",  
                             reason=f"Buy order filled for {stock}",
-                            timestamp=datetime.now()
+                            timestamp=timezone.now()
                         )
                         break
                     elif order.status in [OrderStatus.CANCELED, OrderStatus.REJECTED]:
@@ -116,7 +124,7 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Failed",  
                             reason=f"Buy order {order.status.lower()} for {stock}",
-                            timestamp=datetime.now()
+                            timestamp=timezone.now()
                         )
                         break
                     time.sleep(2)
@@ -130,5 +138,5 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                     stage="Order Confirmation",  # Stage: Order Confirmation
                     status="Failed", 
                     reason=f"Error executing buy order for {stock}: {e}",
-                    timestamp=datetime.now()
+                    timestamp=timezone.now()
                 )

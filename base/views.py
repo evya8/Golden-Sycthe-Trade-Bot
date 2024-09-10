@@ -85,7 +85,7 @@ class UserSettingsView(APIView):
         data = request.data
 
         # Log the incoming data for debugging
-        print("Received data:", data)
+        # print("Received data:", data)
 
         # Handle filter fields (arrays), convert to JSON if necessary
         for key in ['filter_sector', 'filter_symbol']:
@@ -94,12 +94,10 @@ class UserSettingsView(APIView):
 
         # Update only the fields provided in the request
         for key, value in data.items():
-            if key in ['alpaca_api_key', 'alpaca_api_secret']:
-                # Check if API key and secret are present before setting
-                if value:
-                    setattr(user_settings, key, value)
-                else:
-                    print(f"Missing {key} in request data")
+            if key == 'alpaca_api_key' and value:
+                user_settings.alpaca_api_key = value  # This will trigger the encryption
+            elif key == 'alpaca_api_secret' and value:
+                user_settings.alpaca_api_secret = value  # This will trigger the encryption
             else:
                 setattr(user_settings, key, value)
 
@@ -109,7 +107,7 @@ class UserSettingsView(APIView):
         # Return the updated settings with decrypted API keys via the serializer
         serializer = UserSettingSerializer(user_settings)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
 # Bot Operations View
 class BotOperationsView(APIView):
     authentication_classes = [JWTAuthentication]

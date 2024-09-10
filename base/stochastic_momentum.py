@@ -1,5 +1,7 @@
 import logging
 from datetime import datetime, timedelta
+from django.utils import timezone
+import time
 import pandas as pd
 import yfinance as yf
 from alpaca.data.historical import StockHistoricalDataClient
@@ -8,10 +10,18 @@ from alpaca.data.timeframe import TimeFrame
 import vectorbt as vbt
 from .models import BotOperation, TradeSymbols
 
-# Configure logging
+# Subclass logging.Formatter to use UTC
+class UTCFormatter(logging.Formatter):
+    converter = time.gmtime  # Force UTC for log timestamps
 
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Update the logger to use UTCFormatter
+for handler in logger.handlers:
+    handler.setFormatter(UTCFormatter('%(asctime)s - %(levelname)s - %(message)s'))
+
 
 class StochasticMomentumStrategy:
     def __init__(self, user, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
@@ -25,21 +35,26 @@ class StochasticMomentumStrategy:
         self.filtered_stocks = self.screen_stocks()
 
     def screen_stocks(self):
-        # If filter_symbol or filter_sector is provided, log them and send them directly to indicators
+        logger.info(f"Filter symbols: {self.filter_symbol}, Filter sectors: {self.filter_sector}", extra={'username': self.user.username})
+
         if self.filter_symbol:
             logger.info(f"Using provided symbols: {self.filter_symbol}", extra={'username': self.user.username})
             self.log_user_filtered_stocks(self.filter_symbol, "User Selected Symbols")
-            return self.filter_symbol
+            return self.filter_symbol  # Skip additional logging here
 
         if self.filter_sector:
             logger.info(f"Using symbols from provided sector: {self.filter_sector}", extra={'username': self.user.username})
             symbols_in_sector = list(TradeSymbols.objects.filter(sector=self.filter_sector).values_list('symbol', flat=True))
+            if not symbols_in_sector:
+                logger.error(f"No symbols found in the sector {self.filter_sector} for user {self.user.id}")
             self.log_user_filtered_stocks(symbols_in_sector, "User Selected Sectors")
-            return symbols_in_sector
+            return symbols_in_sector  # Skip additional logging here
 
         # If no filters are provided, perform the screening
         def get_symbols():
             symbols = list(TradeSymbols.objects.values_list('symbol', flat=True))
+            if not symbols:
+                logger.error(f"No symbols found in the TradeSymbols table for user {self.user.id}")
             return symbols
 
         def fetch_stock_data(symbols):
@@ -50,7 +65,10 @@ class StochasticMomentumStrategy:
                     info = stock.info
                     bid = info.get('bid')
                     ask = info.get('ask')
-                    bid_ask_spread = (ask - bid) if (bid is not None and ask is not None) else None
+                    bid_ask_spread = (ask - bid) if (ask is not None and bid is not None) else None
+                    if bid is None or ask is None:
+                        logger.error(f"Bid or ask price is missing for {symbol}. Skipping this stock.", extra={'username': self.user.username})
+                        continue
                     data[symbol] = {
                         'average_volume': info.get('averageVolume'),
                         'beta': info.get('beta'),
@@ -82,14 +100,26 @@ class StochasticMomentumStrategy:
             filtered_stocks = pd.concat([filtered_stocks, filtered_chunk])
 
         # Log the stocks that passed the first screening stage
-        for stock in filtered_stocks.index:
+        if not filtered_stocks.empty:
+            for stock in filtered_stocks.index:
+                BotOperation.objects.create(
+                    user=self.user,
+                    stock_symbol=stock,
+                    stage="First Screen",
+                    status="Passed",
+                    reason="Passed initial screening",
+                    timestamp=timezone.now()
+                )
+        else:
+            # Log if no stocks passed after all chunks have been processed
+            logger.info(f"No stocks passed the first screening for user {self.user.id}", extra={'username': self.user.username})
             BotOperation.objects.create(
                 user=self.user,
-                stock_symbol=stock,
+                stock_symbol="None",
                 stage="First Screen",
-                status="Passed",
-                reason="Passed initial screening",
-                timestamp=datetime.now()
+                status="Failed",
+                reason="No stocks found suitable for strategy",
+                timestamp=timezone.now()
             )
 
         logger.info("Filtered stocks:", extra={'username': self.user.username})
@@ -97,9 +127,10 @@ class StochasticMomentumStrategy:
 
         return filtered_stocks.index.tolist()
 
-
     def log_user_filtered_stocks(self, stocks, reason):
         """Logs the stocks chosen by the user with the provided reason."""
+        if not stocks:
+            logger.error(f"No stocks found for the given filter {reason} for user {self.user.id}")
         for stock in stocks:
             BotOperation.objects.create(
                 user=self.user,
@@ -107,7 +138,7 @@ class StochasticMomentumStrategy:
                 stage="First Screen",
                 status="Passed",
                 reason=reason,
-                timestamp=datetime.now()
+                timestamp=timezone.now()
             )
         logger.info(f"User-chosen stocks ({reason}): {stocks}", extra={'username': self.user.username})
 
@@ -163,9 +194,9 @@ class StochasticMomentumStrategy:
 
     def check_signals(self) -> tuple[list[tuple[str, datetime]], list[tuple[str, datetime]]]:
         """Check buy and sell signals for the filtered stocks."""
-        start_date_daily = datetime.now() - timedelta(days=200)
-        start_date_weekly = datetime.now() - timedelta(days=200)
-        end_date = datetime.now() - timedelta(days=1)
+        start_date_daily = timezone.now() - timedelta(days=200)
+        start_date_weekly = timezone.now() - timedelta(days=200)
+        end_date = timezone.now() - timedelta(days=1)
 
         buy_signals = []
         sell_signals = []
@@ -187,7 +218,7 @@ class StochasticMomentumStrategy:
                         stage="Indicator",  # Stage: Indicator
                         status="Passed",  
                         reason="Stochastic Oscillator buy signal generated",
-                        timestamp=datetime.now()
+                        timestamp=timezone.now()
                     )
 
                 if sell_signal:
@@ -199,7 +230,7 @@ class StochasticMomentumStrategy:
                         stage="Indicator",  # Stage: Indicator
                         status="Passed",  
                         reason="Stochastic Oscillator sell signal generated",
-                        timestamp=datetime.now()
+                        timestamp=timezone.now()
                     )
 
                 # Log if no buy or sell signal is generated
@@ -211,7 +242,7 @@ class StochasticMomentumStrategy:
                         stage="Indicator",
                         status="Failed",  
                         reason="No buy/sell signal generated",
-                        timestamp=datetime.now()
+                        timestamp=timezone.now()
                     )
 
             except Exception as e:
