@@ -10,7 +10,6 @@ class BaseConfig(AppConfig):
     scheduler_started = False  # Ensure scheduler is only started once
 
     def ready(self):
-        # Prevent multiple threads from being started on multiple calls to ready()
         if not self.scheduler_started:
             self.scheduler_started = True
             logger.info("Starting the bot scheduler...")

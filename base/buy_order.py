@@ -19,18 +19,18 @@ logger = logging.getLogger(__name__)
 for handler in logger.handlers:
     handler.setFormatter(UTCFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 
-def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
+def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
 
     if buy_signals:
         account = trading_client.get_account()
         buying_power = float(account.buying_power)
         total_equity = float(account.equity)
-        logger.info(f"User's buying power: {buying_power}. User's total equity: {account.equity}", extra={'username': user.username})
+        logger.info(f"User's buying power: {buying_power}. User's total equity: {account.equity}")
 
         for stock, date in buy_signals:
             stock = stock.strip()
-            logger.info(f"Processing stock: {stock} for date: {date}", extra={'username': user.username})
+            logger.info(f"Processing stock: {stock} for date: {date}")
 
             try:
                 orders = trading_client.get_orders(filter=GetOrdersRequest(
@@ -39,10 +39,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                                                     side=OrderSide.BUY))
 
                 if any(order.symbol == stock and order.side == OrderSide.BUY and order.status == OrderStatus.NEW for order in orders):
-                    logger.info(f"There are open orders for {stock}. Skipping...", extra={'username': user.username})
+                    logger.info(f"There are open orders for {stock}. Skipping...")
                     # Log the failure due to open orders
                     BotOperation.objects.create(
-                        user=user,
+                        user=user_id,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
@@ -53,10 +53,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
 
                 positions = trading_client.get_all_positions()
                 if any(position.symbol == stock for position in positions):
-                    logger.info(f"There is already a position for {stock}. Skipping", extra={'username': user.username})
+                    logger.info(f"There is already a position for {stock}. Skipping")
                     # Log the failure due to existing position
                     BotOperation.objects.create(
-                        user=user,
+                        user=user_id,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
@@ -68,10 +68,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                 amount = round(total_equity * (position_size / 100), 2)
 
                 if buying_power < amount:
-                    logger.info(f"Not enough buying power to continue. Current buying power: {buying_power}", extra={'username': user.username})
+                    logger.info(f"Not enough buying power to continue. Current buying power: {buying_power}")
                     # Log the failure due to insufficient buying power
                     BotOperation.objects.create(
-                        user=user,
+                        user=user_id,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
@@ -89,10 +89,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                                             time_in_force=TimeInForce.DAY,
                                             client_order_id=client_order_id))
 
-                logger.info(f"Market order (ID-{client_order_id}) was submitted to buy ${amount} worth of {stock}.", extra={'username': user.username})
+                logger.info(f"Market order (ID-{client_order_id}) was submitted to buy ${amount} worth of {stock}.")
                 # Log the order submission
                 BotOperation.objects.create(
-                    user=user,
+                    user=user_id,
                     stock_symbol=stock,
                     stage="Order Status",  
                     status="Passed", 
@@ -104,10 +104,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                 while True:
                     order = trading_client.get_order_by_client_id(client_order_id)
                     if order.status == OrderStatus.FILLED:
-                        logger.info(f"Order for {stock} has been filled.", extra={'username': user.username})
+                        logger.info(f"Order for {stock} has been filled.")
                         # Log the order fill
                         BotOperation.objects.create(
-                            user=user,
+                            user=user_id,
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Passed",  
@@ -116,10 +116,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                         )
                         break
                     elif order.status in [OrderStatus.CANCELED, OrderStatus.REJECTED]:
-                        logger.warning(f"Order for {stock} was {order.status}.", extra={'username': user.username})
+                        logger.warning(f"Order for {stock} was {order.status}.")
                         # Log the order rejection/cancellation
                         BotOperation.objects.create(
-                            user=user,
+                            user=user_id,
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Failed",  
@@ -130,10 +130,10 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                     time.sleep(2)
 
             except Exception as e:
-                logger.error(f"Error executing buy order for {stock}: {e}", extra={'username': user.username})
+                logger.error(f"Error executing buy order for {stock}: {e}")
                 # Log any errors during the order execution
                 BotOperation.objects.create(
-                    user=user,
+                    user=user_id,
                     stock_symbol=stock,
                     stage="Order Confirmation",  # Stage: Order Confirmation
                     status="Failed", 

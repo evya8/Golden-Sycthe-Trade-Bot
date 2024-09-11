@@ -24,29 +24,29 @@ for handler in logger.handlers:
 
 
 class StochasticMomentumStrategy:
-    def __init__(self, user, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
+    def __init__(self, user_id, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
         self.client = StockHistoricalDataClient(API_KEY, API_SECRET)
         self.volume_threshold = 1000000
         self.beta_threshold = 1.5
         self.bid_ask_spread_threshold = 0.05
-        self.user = user
+        self.user_id = user_id
         self.filter_symbol = filter_symbol if isinstance(filter_symbol, list) else []
         self.filter_sector = filter_sector if isinstance(filter_sector, list) else []
         self.filtered_stocks = self.screen_stocks()
 
     def screen_stocks(self):
-        logger.info(f"Filter symbols: {self.filter_symbol}, Filter sectors: {self.filter_sector}", extra={'username': self.user.username})
+        logger.info(f"Filter symbols: {self.filter_symbol}, Filter sectors: {self.filter_sector}")
 
         if self.filter_symbol:
-            logger.info(f"Using provided symbols: {self.filter_symbol}", extra={'username': self.user.username})
+            logger.info(f"Using provided symbols: {self.filter_symbol}")
             self.log_user_filtered_stocks(self.filter_symbol, "User Selected Symbols")
             return self.filter_symbol  # Skip additional logging here
 
         if self.filter_sector:
-            logger.info(f"Using symbols from provided sector: {self.filter_sector}", extra={'username': self.user.username})
+            logger.info(f"Using symbols from provided sector: {self.filter_sector}")
             symbols_in_sector = list(TradeSymbols.objects.filter(sector=self.filter_sector).values_list('symbol', flat=True))
             if not symbols_in_sector:
-                logger.error(f"No symbols found in the sector {self.filter_sector} for user {self.user.id}")
+                logger.error(f"No symbols found in the sector {self.filter_sector} for user {self.user_id}")
             self.log_user_filtered_stocks(symbols_in_sector, "User Selected Sectors")
             return symbols_in_sector  # Skip additional logging here
 
@@ -54,7 +54,7 @@ class StochasticMomentumStrategy:
         def get_symbols():
             symbols = list(TradeSymbols.objects.values_list('symbol', flat=True))
             if not symbols:
-                logger.error(f"No symbols found in the TradeSymbols table for user {self.user.id}")
+                logger.info(f"No symbols found in the TradeSymbols table for user {self.user_id}")
             return symbols
 
         def fetch_stock_data(symbols):
@@ -67,7 +67,7 @@ class StochasticMomentumStrategy:
                     ask = info.get('ask')
                     bid_ask_spread = (ask - bid) if (ask is not None and bid is not None) else None
                     if bid is None or ask is None:
-                        logger.error(f"Bid or ask price is missing for {symbol}. Skipping this stock.", extra={'username': self.user.username})
+                        logger.error(f"Bid or ask price is missing for {symbol}. Skipping this stock.")
                         continue
                     data[symbol] = {
                         'average_volume': info.get('averageVolume'),
@@ -77,7 +77,7 @@ class StochasticMomentumStrategy:
                         'bid_ask_spread': bid_ask_spread
                     }
                 except Exception as e:
-                    logger.error(f"Error fetching data for {symbol}: {e}", extra={'username': self.user.username})
+                    logger.error(f"Error fetching data for {symbol}: {e}")
                     continue
             return pd.DataFrame.from_dict(data, orient='index')
 
@@ -89,7 +89,7 @@ class StochasticMomentumStrategy:
         filtered_stocks = pd.DataFrame()
 
         for chunk in symbol_chunks:
-            logger.info(f"Processing chunk: {chunk[:5]}...", extra={'username': self.user.username})
+            logger.info(f"Processing chunk: {chunk[:5]}...")
             chunk_data = fetch_stock_data(chunk)
             criteria = (
                 (chunk_data['average_volume'] > self.volume_threshold) &
@@ -103,7 +103,7 @@ class StochasticMomentumStrategy:
         if not filtered_stocks.empty:
             for stock in filtered_stocks.index:
                 BotOperation.objects.create(
-                    user=self.user,
+                    user=self.user_id,
                     stock_symbol=stock,
                     stage="First Screen",
                     status="Passed",
@@ -112,9 +112,9 @@ class StochasticMomentumStrategy:
                 )
         else:
             # Log if no stocks passed after all chunks have been processed
-            logger.info(f"No stocks passed the first screening for user {self.user.id}", extra={'username': self.user.username})
+            logger.info(f"No stocks passed the first screening for user {self.user_id}")
             BotOperation.objects.create(
-                user=self.user,
+                user=self.user_id,
                 stock_symbol="None",
                 stage="First Screen",
                 status="Failed",
@@ -122,25 +122,25 @@ class StochasticMomentumStrategy:
                 timestamp=timezone.now()
             )
 
-        logger.info("Filtered stocks:", extra={'username': self.user.username})
-        logger.info(filtered_stocks.to_string(), extra={'username': self.user.username})
+        logger.info("Filtered stocks:")
+        logger.info(filtered_stocks.to_string())
 
         return filtered_stocks.index.tolist()
 
     def log_user_filtered_stocks(self, stocks, reason):
         """Logs the stocks chosen by the user with the provided reason."""
         if not stocks:
-            logger.error(f"No stocks found for the given filter {reason} for user {self.user.id}")
+            logger.error(f"No stocks found for the given filter {reason} for user {self.user_id}")
         for stock in stocks:
             BotOperation.objects.create(
-                user=self.user,
+                user=self.user_id,
                 stock_symbol=stock,
                 stage="First Screen",
                 status="Passed",
                 reason=reason,
                 timestamp=timezone.now()
             )
-        logger.info(f"User-chosen stocks ({reason}): {stocks}", extra={'username': self.user.username})
+        logger.info(f"User-chosen stocks ({reason}): {stocks}")
 
     def fetch_daily_data(self, stock: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
         """Fetch daily stock data."""
@@ -202,7 +202,7 @@ class StochasticMomentumStrategy:
         sell_signals = []
 
         for stock in self.filtered_stocks:
-            logger.info(f"Processing stock: {stock}", extra={'username': self.user.username})
+            logger.info(f"Processing stock: {stock}")
 
             try:
                 bars_daily = self.fetch_daily_data(stock, start_date_daily, end_date)
@@ -210,10 +210,10 @@ class StochasticMomentumStrategy:
                 buy_signal, sell_signal = self.calculate_signals(stock, bars_daily, bars_weekly)
 
                 if buy_signal:
-                    logger.info(f"Buy signal for {stock} on {bars_daily.index[-1]}", extra={'username': self.user.username})
+                    logger.info(f"Buy signal for {stock} on {bars_daily.index[-1]}")
                     buy_signals.append((stock, bars_daily.index[-1]))
                     BotOperation.objects.create(
-                        user=self.user,
+                        user=self.user_id,
                         stock_symbol=stock,
                         stage="Indicator",  # Stage: Indicator
                         status="Passed",  
@@ -222,10 +222,10 @@ class StochasticMomentumStrategy:
                     )
 
                 if sell_signal:
-                    logger.info(f"Sell signal for {stock} on {bars_daily.index[-1]}", extra={'username': self.user.username})
+                    logger.info(f"Sell signal for {stock} on {bars_daily.index[-1]}")
                     sell_signals.append((stock, bars_daily.index[-1]))
                     BotOperation.objects.create(
-                        user=self.user,
+                        user=self.user_id,
                         stock_symbol=stock,
                         stage="Indicator",  # Stage: Indicator
                         status="Passed",  
@@ -235,9 +235,9 @@ class StochasticMomentumStrategy:
 
                 # Log if no buy or sell signal is generated
                 if not buy_signal and not sell_signal:
-                    logger.info(f"No signals generated for {stock}", extra={'username': self.user.username})
+                    logger.info(f"No signals generated for {stock}")
                     BotOperation.objects.create(
-                        user=self.user,
+                        user=self.user_id,
                         stock_symbol=stock,
                         stage="Indicator",
                         status="Failed",  
@@ -246,6 +246,6 @@ class StochasticMomentumStrategy:
                     )
 
             except Exception as e:
-                logger.error(f"Error processing stock {stock}: {e}", extra={'username': self.user.username})
+                logger.error(f"Error processing stock {stock}: {e}")
 
         return buy_signals, sell_signals

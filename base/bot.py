@@ -112,8 +112,8 @@ def run_bot(user_id):
             valid_sectors = validate_sectors(filter_sector)
 
             if not valid_symbols and not valid_sectors:
-                logger.error(f"No valid symbols or sectors to process for user {user_id}")
-                return
+                logger.info(f"No filters provided from user {user_id} , proceeding to screen stocks")
+                
 
             from .stochastic_momentum import StochasticMomentumStrategy  # Import moved inside the function
             strategy = StochasticMomentumStrategy(
@@ -133,12 +133,12 @@ def run_bot(user_id):
             if buy_signals:
                 from .buy_order import execute_buy_orders  # Import moved inside the function
                 logger.info(f"Executing buy orders for {len(buy_signals)} stocks for user {user_id}.")
-                execute_buy_orders(buy_signals, API_KEY, API_SECRET, position_size)
+                execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
 
             if sell_signals:
                 from .sell_order import execute_sell_orders  # Import moved inside the function
                 logger.info(f"Executing sell orders for {len(sell_signals)} stocks for user {user_id}.")
-                execute_sell_orders(sell_signals, API_KEY, API_SECRET)
+                execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET)
 
             logger.info(f"Bot run completed successfully for user ID {user_id} at {timezone.now()}.")
 
@@ -177,39 +177,49 @@ def toggle_bot(user_id):
         logger.error(f"An error occurred while toggling the bot for user ID {user_id}: {e}")
         logger.error(f"Error details: {traceback.format_exc()}")
 
+# Global lock to ensure that the entire bot execution runs only once at a time
+execution_lock = threading.Lock()
+
 def run_bot_for_all_users():
-    logger.info(f"Attempting to run bots at {timezone.now()} (Server Time)")
-    try:
-        from .models import UserSetting  # Import moved inside the function
-        active_users = UserSetting.objects.filter(bot_active=True).values_list('user_id', flat=True)
-        
-        logger.info(f"Running bot for {len(active_users)} active users.")
-        
-        for user_id in active_users:
-            run_bot(user_id)  # Avoid threading, run bots sequentially to prevent overlap
+    if execution_lock.locked():
+        logger.warning("A bot execution is already in progress. Skipping this run.")
+        return
 
-    except Exception as e:
-        logger.error(f"Error in running bots for users: {e}")
-        logger.error(f"Error details: {traceback.format_exc()}")
+    with execution_lock:
+        logger.info(f"Attempting to run bots at {timezone.now()} (Server Time)")
+        try:
+            from .models import UserSetting  # Import moved inside the function
+            active_users = UserSetting.objects.filter(bot_active=True).values_list('user_id', flat=True)
 
-### 2. Scheduling with APScheduler
+            logger.info(f"Running bot for {len(active_users)} active users.")
+
+            for user_id in active_users:
+                run_bot(user_id)  # Avoid threading, run bots sequentially to prevent overlap
+
+        except Exception as e:
+            logger.error(f"Error in running bots for users: {e}")
+            logger.error(f"Error details: {traceback.format_exc()}")
+
+
+### Scheduling with APScheduler
 
 def schedule_all_bots():
     scheduler = BackgroundScheduler(timezone='US/Eastern')
-    
+
     # Schedule the bot to run at 10:15 AM Monday to Friday
     scheduler.add_job(
-        run_bot_for_all_users, 
-        'cron', 
-        day_of_week='mon-fri', 
-        hour=10, 
-        minute=15, 
-        misfire_grace_time=7200,  # Allow the job to be run within 2 hours of the scheduled time
+        run_bot_for_all_users,
+        'cron',
+        day_of_week='mon-fri',
+        hour=10,
+        minute=15,
+        misfire_grace_time=3600,  # Allow the job to run within 1 hour of the scheduled time
         max_instances=1,  # Only one instance should run at a time
-        coalesce=True  # Merge missed executions to avoid overlapping runs
-    )    
+        coalesce=False  # Do not merge missed executions to avoid stacking jobs
+    )
+
     logger.info("Scheduler started. Bots will run at 10:15 AM Monday to Friday.")
-    
+
     # Start the scheduler
     scheduler.start()
 
@@ -220,3 +230,4 @@ def schedule_all_bots():
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown(wait=False)
         logger.info("Scheduler shut down.")
+
