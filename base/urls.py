@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
+
 urlpatterns = [
     path('api/register/', RegisterView.as_view(), name='register'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Login using SimpleJWT
@@ -16,5 +17,6 @@ urlpatterns = [
     path('api/symbols/', SymbolsView.as_view(), name='symbols'),
     path('api/user/', UserDetailView.as_view(), name='user-detail'),  
     path('api/backtest/', BacktestView.as_view(), name='backtest'),
+
 
 ]

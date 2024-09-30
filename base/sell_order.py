@@ -22,7 +22,7 @@ for handler in logger.handlers:
 
 def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
-    user_id=user.id
+    user_id = user.id
 
     if sell_signals:
         for stock, date in sell_signals:
@@ -30,45 +30,26 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
             logger.info(f"Processing stock: {stock} for date: {date}")
 
             try:
-                # Check if there is already an open position for the stock
-                positions = trading_client.get_all_positions()
-                position = next((pos for pos in positions if pos.symbol == stock), None)
-                time.sleep(2)
-
-                if position is None:
-                    logger.info(f"No position found for {stock}. Skipping...")
-                    # Log the failure due to no position
-                    BotOperation.objects.create(
-                    user=user,
-                    stock_symbol=stock,
-                    stage="Order Status", 
-                    status="Failed",  
-                    reason=f"There is no position for {stock}",
-                    timestamp=timezone.now()
-                    )
-                    continue
-
-                logger.info(f"Found a position of {position.qty} for {stock}")
+                # Since you already filtered signals for stocks with open positions, no need to check again.
 
                 # Check if there is already an open order for the stock
                 orders = trading_client.get_orders(filter=GetOrdersRequest(
-                                                   status=QueryOrderStatus.OPEN,
-                                                   symbol=stock,
-                                                   side=OrderSide.SELL))
-                time.sleep(2)
-                    
-                if any(order.symbol == stock and order.side == OrderSide.SELL and order.status in [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PENDING_NEW] for order in orders):
-                    logger.info(f"There are open orders for {stock}. Skipping...")
-                    # Log the failure due to open orders
+                    status=QueryOrderStatus.OPEN,
+                    symbol=stock,
+                    side=OrderSide.SELL  # Filter for sell orders directly
+                ))
+
+                if any(order.status in [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PENDING_NEW] for order in orders):
+                    logger.info(f"There are open sell orders for {stock}. Skipping...")
+                    # Log the failure due to open sell orders
                     BotOperation.objects.create(
-                    user=user,
-                    stock_symbol=stock,
-                    stage="Order Status", 
-                    status="Failed",  
-                    reason=f"There is already open sell order for {stock}",
-                    timestamp=timezone.now()
+                        user=user,
+                        stock_symbol=stock,
+                        stage="Order Status", 
+                        status="Failed",  
+                        reason=f"There is already an open sell order for {stock}",
+                        timestamp=timezone.now()
                     )
-                    time.sleep(2)
                     continue
 
                 # Generate a unique client order ID
@@ -80,7 +61,8 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                     close_options=ClosePositionRequest(
                         percentage="100",
                         time_in_force=TimeInForce.DAY,
-                        client_order_id=client_order_id)
+                        client_order_id=client_order_id
+                    )
                 )
 
                 logger.info(f"Closing position of {stock}, Order ID-{client_order_id}.")
@@ -93,15 +75,19 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                     reason=f"Sell order submitted for {stock}",
                     timestamp=timezone.now()
                 )
-                time.sleep(2)
 
-                # Check Position Status
-                while True:
+                # Timeout settings for waiting for the position to close
+                timeout = 120  # seconds
+                start_time = time.time()
+
+                # Check position status with timeout and dynamic sleep
+                while time.time() - start_time < timeout:
+                    # Refresh positions to check if it has been closed
                     positions = trading_client.get_all_positions()
                     position = next((pos for pos in positions if pos.symbol == stock), None)
 
                     if position is None:
-                        logger.info(f"Position for {stock} has been closed")
+                        logger.info(f"Position for {stock} has been closed.")
                         # Log the order fulfillment
                         BotOperation.objects.create(
                             user=user,
@@ -114,16 +100,28 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                         break
                     else:
                         logger.info(f"Waiting for position {stock} to close...")
-                        time.sleep(2)
+                        time.sleep(2)  # Retry after a delay if the position is still open
+
+                # Handle timeout case
+                if position is not None:
+                    logger.error(f"Timeout while waiting for position {stock} to close.")
+                    BotOperation.objects.create(
+                        user=user,
+                        stock_symbol=stock,
+                        stage="Order Confirmation", 
+                        status="Failed",  
+                        reason=f"Timeout while waiting for position {stock} to close",
+                        timestamp=timezone.now()
+                    )
 
             except Exception as e:
-                logger.error(f"Error executing sell order for {stock}: {e}")
+                logger.error(f"Error executing sell order for {stock}: {type(e).__name__} - {e}")
                 # Log any errors during the order execution
                 BotOperation.objects.create(
                     user=user,
                     stock_symbol=stock,
-                    stage="Order Confirmation",  # Stage: Order Confirmation
+                    stage="Order Confirmation", 
                     status="Failed", 
-                    reason=f"Error executing sell order for {stock}: {e}",
+                    reason=f"Error executing sell order for {stock}: {type(e).__name__} - {e}",
                     timestamp=timezone.now()
                 )

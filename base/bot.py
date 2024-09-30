@@ -216,7 +216,7 @@ def schedule_all_bots():
         'cron',
         day_of_week='mon-fri',
         hour=10,
-        minute=15,
+        minute=32,
         misfire_grace_time=3600,  # Allow the job to run within 1 hour of the scheduled time
         max_instances=1,  # Only one instance should run at a time
         coalesce=False  # Do not merge missed executions to avoid stacking jobs

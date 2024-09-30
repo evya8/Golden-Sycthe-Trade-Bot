@@ -10,6 +10,7 @@ from .bot import toggle_bot
 from .backtesting import run_backtest
 import json
 
+
 # Symbols View
 class SymbolsView(APIView):
     def get(self, request):

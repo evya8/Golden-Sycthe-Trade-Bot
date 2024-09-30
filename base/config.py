@@ -11,7 +11,7 @@
 
 ###   Database
 
-# DATABASE_USER="root"
-# DATABASE_PASSWORD="Peppalemon5"
-# DATABASE_NAME="TradeBotVer1"
-# DATABASE_HOST="localhost"
+DATABASE_USER="root"
+DATABASE_PASSWORD="Peppalemon5"
+DATABASE_NAME="TradeBotVer1"
+DATABASE_HOST="localhost"

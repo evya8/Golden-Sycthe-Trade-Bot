@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import yfinance as yf
 from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.trading.client import TradingClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 import vectorbt as vbt
@@ -26,6 +27,7 @@ for handler in logger.handlers:
 class StochasticMomentumStrategy:
     def __init__(self, user, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
         self.client = StockHistoricalDataClient(API_KEY, API_SECRET)
+        self.trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
         self.volume_threshold = 1000000
         self.beta_threshold = 1.5
         self.bid_ask_spread_threshold = 0.05
@@ -34,6 +36,19 @@ class StochasticMomentumStrategy:
         self.filter_symbol = filter_symbol if isinstance(filter_symbol, list) else []
         self.filter_sector = filter_sector if isinstance(filter_sector, list) else []
         self.filtered_stocks = self.screen_stocks()
+        self.open_positions = self.get_open_positions()  # Fetch open positions during initialization
+
+
+    def get_open_positions(self):
+        """Fetches all open positions from Alpaca."""
+        try:
+            positions = self.trading_client.get_all_positions()
+            open_position_symbols = [position.symbol for position in positions]
+            logger.info(f"Open positions: {open_position_symbols}")
+            return open_position_symbols
+        except Exception as e:
+            logger.error(f"Error fetching open positions: {e}")
+            return []
 
     def screen_stocks(self):
         logger.info(f"Filter symbols: {self.filter_symbol}, Filter sectors: {self.filter_sector}")
@@ -223,7 +238,7 @@ class StochasticMomentumStrategy:
 
 
     def check_signals(self) -> tuple[list[tuple[str, datetime]], list[tuple[str, datetime]]]:
-        """Check buy and sell signals for the filtered stocks."""
+        """Check buy and sell signals for the filtered stocks, but only generate sell signals for stocks with open positions."""
         start_date_daily = timezone.now() - timedelta(days=200)
         start_date_weekly = timezone.now() - timedelta(days=200)
         end_date = timezone.now() - timedelta(days=1)
@@ -257,7 +272,8 @@ class StochasticMomentumStrategy:
                     )
                     time.sleep(1)
 
-                if sell_signal:
+                # Only log and process sell signals for stocks with open positions
+                if sell_signal and stock in self.open_positions:
                     logger.info(f"Sell signal for {stock} on {bars_daily.index[-1]}")
                     sell_signals.append((stock, bars_daily.index[-1]))
                     BotOperation.objects.create(
@@ -269,7 +285,8 @@ class StochasticMomentumStrategy:
                         timestamp=timezone.now()
                     )
                     time.sleep(1)
-
+                elif sell_signal:
+                    logger.info(f"Sell signal generated for {stock}, but no open position exists. Skipping sell execution.")
 
                 # Log if no buy or sell signal is generated
                 if not buy_signal and not sell_signal:
