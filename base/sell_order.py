@@ -20,8 +20,9 @@ for handler in logger.handlers:
     handler.setFormatter(UTCFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 
-def execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET):
+def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
+    user_id=user.id
 
     if sell_signals:
         for stock, date in sell_signals:
@@ -32,12 +33,13 @@ def execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET):
                 # Check if there is already an open position for the stock
                 positions = trading_client.get_all_positions()
                 position = next((pos for pos in positions if pos.symbol == stock), None)
+                time.sleep(2)
 
                 if position is None:
                     logger.info(f"No position found for {stock}. Skipping...")
                     # Log the failure due to no position
                     BotOperation.objects.create(
-                    user=user_id,
+                    user=user,
                     stock_symbol=stock,
                     stage="Order Status", 
                     status="Failed",  
@@ -53,18 +55,20 @@ def execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET):
                                                    status=QueryOrderStatus.OPEN,
                                                    symbol=stock,
                                                    side=OrderSide.SELL))
+                time.sleep(2)
                     
                 if any(order.symbol == stock and order.side == OrderSide.SELL and order.status in [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.PENDING_NEW] for order in orders):
                     logger.info(f"There are open orders for {stock}. Skipping...")
                     # Log the failure due to open orders
                     BotOperation.objects.create(
-                    user=user_id,
+                    user=user,
                     stock_symbol=stock,
                     stage="Order Status", 
                     status="Failed",  
                     reason=f"There is already open sell order for {stock}",
                     timestamp=timezone.now()
                     )
+                    time.sleep(2)
                     continue
 
                 # Generate a unique client order ID
@@ -82,14 +86,14 @@ def execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET):
                 logger.info(f"Closing position of {stock}, Order ID-{client_order_id}.")
                 # Log the order submission
                 BotOperation.objects.create(
-                    user=user_id,
+                    user=user,
                     stock_symbol=stock,
                     stage="Order Status", 
                     status="Passed",  
                     reason=f"Sell order submitted for {stock}",
                     timestamp=timezone.now()
                 )
-                time.sleep(3)
+                time.sleep(2)
 
                 # Check Position Status
                 while True:
@@ -100,7 +104,7 @@ def execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET):
                         logger.info(f"Position for {stock} has been closed")
                         # Log the order fulfillment
                         BotOperation.objects.create(
-                            user=user_id,
+                            user=user,
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Filled",  # Status: Order filled
@@ -116,7 +120,7 @@ def execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET):
                 logger.error(f"Error executing sell order for {stock}: {e}")
                 # Log any errors during the order execution
                 BotOperation.objects.create(
-                    user=user_id,
+                    user=user,
                     stock_symbol=stock,
                     stage="Order Confirmation",  # Stage: Order Confirmation
                     status="Failed", 

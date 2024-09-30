@@ -39,9 +39,11 @@ def get_user_settings(user_id):
 
         logger.info(f"User settings fetched for user ID {user_id}")
         return {
+            'user': user,
+            'user_id': user_id,
             'bot_active': user_settings.bot_active,
-            'api_key': user_settings._alpaca_api_key,
-            'api_secret': user_settings._alpaca_api_secret,
+            'api_key': user_settings.alpaca_api_key,
+            'api_secret': user_settings.alpaca_api_secret,
             'position_size': user_settings.position_size,
             'filter_sector': filter_sector,
             'filter_symbol': filter_symbol
@@ -91,6 +93,8 @@ def run_bot(user_id):
             if settings is None:
                 logger.error(f"User settings for user ID {user_id} not found.")
                 return
+            
+            user = settings['user'] 
 
             logger.info(f"Running bot for user ID: {user_id}. Bot Active: {settings['bot_active']}")
 
@@ -117,7 +121,7 @@ def run_bot(user_id):
 
             from .stochastic_momentum import StochasticMomentumStrategy  # Import moved inside the function
             strategy = StochasticMomentumStrategy(
-                user_id=user_id,
+                user=user,
                 API_KEY=API_KEY,
                 API_SECRET=API_SECRET,
                 filter_symbol=valid_symbols,
@@ -133,12 +137,12 @@ def run_bot(user_id):
             if buy_signals:
                 from .buy_order import execute_buy_orders  # Import moved inside the function
                 logger.info(f"Executing buy orders for {len(buy_signals)} stocks for user {user_id}.")
-                execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
+                execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size)
 
             if sell_signals:
                 from .sell_order import execute_sell_orders  # Import moved inside the function
                 logger.info(f"Executing sell orders for {len(sell_signals)} stocks for user {user_id}.")
-                execute_sell_orders(user_id, sell_signals, API_KEY, API_SECRET)
+                execute_sell_orders(user, sell_signals, API_KEY, API_SECRET)
 
             logger.info(f"Bot run completed successfully for user ID {user_id} at {timezone.now()}.")
 

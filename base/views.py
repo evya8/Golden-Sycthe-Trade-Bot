@@ -7,6 +7,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import UserSetting, BotOperation, TradeSymbols
 from .serializers import UserSerializer, UserSettingSerializer, BotOperationSerializer
 from .bot import toggle_bot
+from .backtesting import run_backtest
 import json
 
 # Symbols View
@@ -133,3 +134,21 @@ class ToggleBotView(APIView):
             return Response({'message': 'Bot activation state toggled successfully.'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class BacktestView(APIView):
+    def post(self, request):
+        data = request.data
+        user_id = data.get('user_id')
+        trade_frequency = data.get('trade_frequency')
+        symbol = data.get('symbol')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        total_capital = data.get('total_capital')
+
+        # Call the run_backtest function
+        result = run_backtest(user_id, trade_frequency, symbol, start_date, end_date, total_capital)
+
+        if 'error' in result:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(result, status=status.HTTP_200_OK)

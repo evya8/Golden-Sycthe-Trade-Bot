@@ -24,12 +24,13 @@ for handler in logger.handlers:
 
 
 class StochasticMomentumStrategy:
-    def __init__(self, user_id, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
+    def __init__(self, user, API_KEY, API_SECRET, filter_symbol=None, filter_sector=None):
         self.client = StockHistoricalDataClient(API_KEY, API_SECRET)
         self.volume_threshold = 1000000
         self.beta_threshold = 1.5
         self.bid_ask_spread_threshold = 0.05
-        self.user_id = user_id
+        self.user = user
+        self.user_id = user.id
         self.filter_symbol = filter_symbol if isinstance(filter_symbol, list) else []
         self.filter_sector = filter_sector if isinstance(filter_sector, list) else []
         self.filtered_stocks = self.screen_stocks()
@@ -57,29 +58,36 @@ class StochasticMomentumStrategy:
                 logger.info(f"No symbols found in the TradeSymbols table for user {self.user_id}")
             return symbols
 
-        def fetch_stock_data(symbols):
+        def fetch_stock_data(symbols, retries=3):
             data = {}
             for symbol in symbols:
-                stock = yf.Ticker(symbol)
-                try:
-                    info = stock.info
-                    bid = info.get('bid')
-                    ask = info.get('ask')
-                    bid_ask_spread = (ask - bid) if (ask is not None and bid is not None) else None
-                    if bid is None or ask is None:
-                        logger.error(f"Bid or ask price is missing for {symbol}. Skipping this stock.")
-                        continue
-                    data[symbol] = {
-                        'average_volume': info.get('averageVolume'),
-                        'beta': info.get('beta'),
-                        'bid': bid,
-                        'ask': ask,
-                        'bid_ask_spread': bid_ask_spread
-                    }
-                except Exception as e:
-                    logger.error(f"Error fetching data for {symbol}: {e}")
-                    continue
+                for attempt in range(retries):
+                    stock = yf.Ticker(symbol)
+                    try:
+                        info = stock.info
+                        bid = info.get('bid')
+                        ask = info.get('ask')
+                        bid_ask_spread = (ask - bid) if (ask is not None and bid is not None) else None
+                        if bid is None or ask is None:
+                            if attempt < retries - 1:
+                                logger.warning(f"Retrying {symbol} ({attempt+1}/{retries})")
+                                time.sleep(3)  # Delay before retry
+                                continue
+                            logger.error(f"Bid or ask price is missing for {symbol}. Skipping this stock.")
+                            break
+                        data[symbol] = {
+                            'average_volume': info.get('averageVolume'),
+                            'beta': info.get('beta'),
+                            'bid': bid,
+                            'ask': ask,
+                            'bid_ask_spread': bid_ask_spread
+                        }
+                        break
+                    except Exception as e:
+                        logger.error(f"Error fetching data for {symbol}: {e}")
+                        break
             return pd.DataFrame.from_dict(data, orient='index')
+
 
         def split_list(lst, chunk_size):
             for i in range(0, len(lst), chunk_size):
@@ -103,7 +111,7 @@ class StochasticMomentumStrategy:
         if not filtered_stocks.empty:
             for stock in filtered_stocks.index:
                 BotOperation.objects.create(
-                    user=self.user_id,
+                    user=self.user,
                     stock_symbol=stock,
                     stage="First Screen",
                     status="Passed",
@@ -114,7 +122,7 @@ class StochasticMomentumStrategy:
             # Log if no stocks passed after all chunks have been processed
             logger.info(f"No stocks passed the first screening for user {self.user_id}")
             BotOperation.objects.create(
-                user=self.user_id,
+                user=self.user,
                 stock_symbol="None",
                 stage="First Screen",
                 status="Failed",
@@ -133,7 +141,7 @@ class StochasticMomentumStrategy:
             logger.error(f"No stocks found for the given filter {reason} for user {self.user_id}")
         for stock in stocks:
             BotOperation.objects.create(
-                user=self.user_id,
+                user=self.user,
                 stock_symbol=stock,
                 stage="First Screen",
                 status="Passed",
@@ -141,6 +149,7 @@ class StochasticMomentumStrategy:
                 timestamp=timezone.now()
             )
         logger.info(f"User-chosen stocks ({reason}): {stocks}")
+
 
     def fetch_daily_data(self, stock: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
         """Fetch daily stock data."""
@@ -152,6 +161,9 @@ class StochasticMomentumStrategy:
             adjustment='all'
         )
         bars_daily = self.client.get_stock_bars(request_params).df.reset_index(level='symbol', drop=True)
+        
+        # Add a delay after each API call
+        time.sleep(1)  # Adjust the delay time as necessary
         return bars_daily
 
     def fetch_weekly_data(self, stock: str, start_date: datetime, end_date: datetime) -> pd.DataFrame:
@@ -164,33 +176,51 @@ class StochasticMomentumStrategy:
             adjustment='all'
         )
         bars_weekly = self.client.get_stock_bars(request_params).df.reset_index(level='symbol', drop=True)
+        
+        # Add a delay after each API call
+        time.sleep(1)  # Adjust the delay time as necessary
         return bars_weekly
 
     def calculate_signals(self, stock: str, bars_daily: pd.DataFrame, bars_weekly: pd.DataFrame) -> tuple[bool, bool]:
-        """Calculate buy and sell signals based on Stochastic Oscillator."""
-        stoch = vbt.STOCH.run(
-            high=bars_weekly['high'], 
-            low=bars_weekly['low'], 
-            close=bars_weekly['close'],
-            k_window=10, 
-            d_window=3, 
-            d_ewm=False  
-        )
+        """
+        Calculate buy and sell signals based on Stochastic Oscillator.
+        Buy signal: %K above 32 and %K above %D.
+        Sell signal: %K below 80 and %K below %D.
+        """
+        try:
+            # Stochastic Oscillator signals on bars_weekly (higher timeframe)
+            stoch = vbt.STOCH.run(
+                high=bars_weekly['high'], 
+                low=bars_weekly['low'], 
+                close=bars_weekly['close'],
+                k_window=10, 
+                d_window=3, 
+                d_ewm=False  
+            )
 
-        stoch_k = stoch.percent_k
-        stoch_d = stoch.percent_d
-        
-        stoch_buy_signal = (stoch_k > 32) & (stoch_k > stoch_d)
-        stoch_buy_signal = stoch_buy_signal.reindex(bars_daily.index, method='ffill').fillna(False).infer_objects(copy=False)
-        
-        stoch_sell_signal = (stoch_k < 80) & (stoch_k < stoch_d)
-        stoch_sell_signal = stoch_sell_signal.reindex(bars_daily.index, method='ffill').fillna(False).infer_objects(copy=False)
+            # %K and %D values
+            stoch_k = stoch.percent_k
+            stoch_d = stoch.percent_d
 
-        prev_day = bars_daily.index[-1]
-        buy_signal = stoch_buy_signal.loc[prev_day]
-        sell_signal = stoch_sell_signal.loc[prev_day]
+            # Buy signal: %K above 32 and %K above %D
+            stoch_buy_signal = (stoch_k > 32) & (stoch_k > stoch_d)
+            stoch_buy_signal = stoch_buy_signal.reindex(bars_daily.index, method='ffill').fillna(False)
 
-        return buy_signal, sell_signal
+            # Sell signal: %K below 80 and %K below %D
+            stoch_sell_signal = (stoch_k < 80) & (stoch_k < stoch_d)
+            stoch_sell_signal = stoch_sell_signal.reindex(bars_daily.index, method='ffill').fillna(False)
+
+            # Get the signal for the most recent day
+            prev_day = bars_daily.index[-1]
+            buy_signal = stoch_buy_signal.loc[prev_day]
+            sell_signal = stoch_sell_signal.loc[prev_day]
+
+            return buy_signal, sell_signal
+
+        except Exception as e:
+            logger.error(f"Error calculating signals for {stock}: {e}")
+            return False, False
+
 
     def check_signals(self) -> tuple[list[tuple[str, datetime]], list[tuple[str, datetime]]]:
         """Check buy and sell signals for the filtered stocks."""
@@ -205,47 +235,58 @@ class StochasticMomentumStrategy:
             logger.info(f"Processing stock: {stock}")
 
             try:
+                # Fetch daily and weekly data
                 bars_daily = self.fetch_daily_data(stock, start_date_daily, end_date)
+                time.sleep(1)
                 bars_weekly = self.fetch_weekly_data(stock, start_date_weekly, end_date)
+                time.sleep(1)
+
+                # Calculate signals
                 buy_signal, sell_signal = self.calculate_signals(stock, bars_daily, bars_weekly)
 
                 if buy_signal:
                     logger.info(f"Buy signal for {stock} on {bars_daily.index[-1]}")
                     buy_signals.append((stock, bars_daily.index[-1]))
                     BotOperation.objects.create(
-                        user=self.user_id,
+                        user=self.user,
                         stock_symbol=stock,
                         stage="Indicator",  # Stage: Indicator
-                        status="Passed",  
+                        status="Passed",
                         reason="Stochastic Oscillator buy signal generated",
                         timestamp=timezone.now()
                     )
+                    time.sleep(1)
 
                 if sell_signal:
                     logger.info(f"Sell signal for {stock} on {bars_daily.index[-1]}")
                     sell_signals.append((stock, bars_daily.index[-1]))
                     BotOperation.objects.create(
-                        user=self.user_id,
+                        user=self.user,
                         stock_symbol=stock,
                         stage="Indicator",  # Stage: Indicator
-                        status="Passed",  
+                        status="Passed",
                         reason="Stochastic Oscillator sell signal generated",
                         timestamp=timezone.now()
                     )
+                    time.sleep(1)
+
 
                 # Log if no buy or sell signal is generated
                 if not buy_signal and not sell_signal:
                     logger.info(f"No signals generated for {stock}")
                     BotOperation.objects.create(
-                        user=self.user_id,
+                        user=self.user,
                         stock_symbol=stock,
                         stage="Indicator",
-                        status="Failed",  
+                        status="Failed",
                         reason="No buy/sell signal generated",
                         timestamp=timezone.now()
                     )
 
             except Exception as e:
                 logger.error(f"Error processing stock {stock}: {e}")
+            
+            # Add a delay after processing each stock
+            time.sleep(1)
 
         return buy_signals, sell_signals

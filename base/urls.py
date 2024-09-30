@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RegisterView, LogoutView, UserSettingsView, BotOperationsView, ToggleBotView, SymbolsView, UserDetailView
+from .views import RegisterView, LogoutView, UserSettingsView, BotOperationsView, ToggleBotView, SymbolsView, UserDetailView , BacktestView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -15,5 +15,6 @@ urlpatterns = [
     path('api/toggle-bot/', ToggleBotView.as_view(), name='toggle-bot'),
     path('api/symbols/', SymbolsView.as_view(), name='symbols'),
     path('api/user/', UserDetailView.as_view(), name='user-detail'),  
+    path('api/backtest/', BacktestView.as_view(), name='backtest'),
 
 ]

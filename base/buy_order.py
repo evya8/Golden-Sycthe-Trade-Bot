@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 for handler in logger.handlers:
     handler.setFormatter(UTCFormatter('%(asctime)s - %(levelname)s - %(message)s'))
 
-def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size):
+def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
     trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
+    user_id = user.id
 
     if buy_signals:
         account = trading_client.get_account()
@@ -38,17 +39,18 @@ def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
                                                     symbol=stock,
                                                     side=OrderSide.BUY))
 
-                if any(order.symbol == stock and order.side == OrderSide.BUY and order.status == OrderStatus.NEW for order in orders):
+                if any(order.status in [OrderStatus.NEW, OrderStatus.PENDING_NEW, OrderStatus.ACCEPTED] for order in orders):
                     logger.info(f"There are open orders for {stock}. Skipping...")
                     # Log the failure due to open orders
                     BotOperation.objects.create(
-                        user=user_id,
+                        user=user,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
                         reason=f"There is already open buy order for {stock}",
                         timestamp=timezone.now()
                     )
+                    time.sleep(2)
                     continue
 
                 positions = trading_client.get_all_positions()
@@ -56,13 +58,14 @@ def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
                     logger.info(f"There is already a position for {stock}. Skipping")
                     # Log the failure due to existing position
                     BotOperation.objects.create(
-                        user=user_id,
+                        user=user,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
                         reason=f"There is already a position for {stock}",
                         timestamp=timezone.now()
                     )
+                    time.sleep(2)
                     continue
 
                 amount = round(total_equity * (position_size / 100), 2)
@@ -71,7 +74,7 @@ def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
                     logger.info(f"Not enough buying power to continue. Current buying power: {buying_power}")
                     # Log the failure due to insufficient buying power
                     BotOperation.objects.create(
-                        user=user_id,
+                        user=user,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
@@ -92,7 +95,7 @@ def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
                 logger.info(f"Market order (ID-{client_order_id}) was submitted to buy ${amount} worth of {stock}.")
                 # Log the order submission
                 BotOperation.objects.create(
-                    user=user_id,
+                    user=user,
                     stock_symbol=stock,
                     stage="Order Status",  
                     status="Passed", 
@@ -107,19 +110,20 @@ def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
                         logger.info(f"Order for {stock} has been filled.")
                         # Log the order fill
                         BotOperation.objects.create(
-                            user=user_id,
+                            user=user,
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Passed",  
                             reason=f"Buy order filled for {stock}",
                             timestamp=timezone.now()
                         )
+                        time.sleep(2)
                         break
                     elif order.status in [OrderStatus.CANCELED, OrderStatus.REJECTED]:
                         logger.warning(f"Order for {stock} was {order.status}.")
                         # Log the order rejection/cancellation
                         BotOperation.objects.create(
-                            user=user_id,
+                            user=user,
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Failed",  
@@ -133,7 +137,7 @@ def execute_buy_orders(user_id, buy_signals, API_KEY, API_SECRET, position_size)
                 logger.error(f"Error executing buy order for {stock}: {e}")
                 # Log any errors during the order execution
                 BotOperation.objects.create(
-                    user=user_id,
+                    user=user,
                     stock_symbol=stock,
                     stage="Order Confirmation",  # Stage: Order Confirmation
                     status="Failed", 
