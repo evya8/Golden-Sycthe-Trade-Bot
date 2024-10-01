@@ -6,11 +6,28 @@ A sophisticated, automated trading bot designed to manage and execute trades bas
 
 - **Automated Trade Execution**: Executes buy and sell orders automatically based on signals.
 - **User-Defined Filters**: Set filters based on symbols, sectors, and custom parameters.
-- **Django + React Frontend**: A modern user interface for real-time bot monitoring and management.
 - **Bot Operations Logging**: Tracks every stage of the trade process for easy analysis.
+- **Account Tracking**: Displays all open positions and actions in the user account.
+- **Backtesting**: Backtesting the strategy on different stocks, timeframes and trade frequencies.
+- **Django + React Frontend**: A modern user interface for real-time bot monitoring and management.
+- **MySQL Database**: Storing passwords and API keys in a secure manner as well as logging user and bot data.
 - **Dark Mode UI**: Stylish interface with Material-UI (MUI) and a sleek dark theme.
 
 ---
+
+![Easy and Friendly User Dashboard](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard1.jpg)
+
+![Monitor the Bot Process and Progress](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard2.jpg)
+
+![Keep Track On Your Account](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard3.jpg)
+
+![Backtest the Strategy - Get Detailed Graphs](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Backtest1.jpg)
+
+![Backtest the Strategy - Get Stats and Insights](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Backtest2.jpg)
+
+![Instructions For Getting Alpaca's API Keys](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/API.jpg)
+
+
 
 ## 📦 Installation
 
@@ -49,11 +66,7 @@ Schedule the Bot: The bot is designed to run during US market hours. Make sure t
 
 Alpaca API Keys:
 Obtain your API keys from Alpaca.
-Set your API keys securely by encrypting them before saving them to the database. 
-Example:
-
-ALPACA_API_KEY = os.getenv('ALPACA_API_KEY')
-ALPACA_SECRET_KEY = os.getenv('ALPACA_SECRET_KEY')
+Set your API keys securely by saving them to the database. 
 
 Timezone:
 The bot operates in US/Eastern time to align with market hours.
