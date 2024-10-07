@@ -92,8 +92,8 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                         BotOperation.objects.create(
                             user=user,
                             stock_symbol=stock,
-                            stage="Order Confirmation",  # Stage: Order Confirmation
-                            status="Filled",  # Status: Order filled
+                            stage="Order Confirmation",  
+                            status="Passed",  
                             reason=f"Sell order filled for {stock}",
                             timestamp=timezone.now()
                         )

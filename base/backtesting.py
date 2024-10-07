@@ -56,15 +56,15 @@ def run_backtest(user_id, trade_frequency, symbol, start_date, end_date, total_c
     
     # Determine TimeFrame and data resolution based on trade_frequency
     print(f"Determining timeframes based on trade_frequency: {trade_frequency}")
-    if trade_frequency == 'weekly':
+    if trade_frequency == 'low':
         timeframe1 = TimeFrame.Week
         timeframe2 = TimeFrame.Day
         max_duration = pd.Timedelta(days=5*365)  # 5 years
-    elif trade_frequency == 'daily':
+    elif trade_frequency == 'mid':
         timeframe1 = TimeFrame.Day
         timeframe2 = TimeFrame.Hour
         max_duration = pd.Timedelta(days=3*365)  # 3 years
-    elif trade_frequency == 'hourly':
+    elif trade_frequency == 'high':
         timeframe1 = TimeFrame.Hour
         timeframe2 = TimeFrame.Minute
         max_duration = pd.Timedelta(days=365)  # 1 year
