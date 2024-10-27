@@ -17,7 +17,6 @@ A sophisticated, automated trading bot designed to manage and execute trades bas
 
 ---
 
-![Easy and Friendly User Dashboard](Screenshots/Dashboard - Stock Updates, News Feed, User Configurations.png)
 
 ![Monitor the Bot Process and Progress](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard%20-%20Stock%20Updates%2C%20News%20Feed%2C%20User%20Configurations.png)
 
