@@ -1,115 +1,70 @@
-# Golden Scythe Trade Bot ⚔️
+# Getting Started with Create React App
 
-A sophisticated, automated trading bot designed to manage and execute trades based on customizable strategy and market data. It integrates with the Alpaca API and features a momentum-based trading strategy.
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## 🌟 Features
+## Available Scripts
 
-- **Automated Trade Execution**: Executes buy and sell orders automatically based on signals.
-- **User-Defined Filters**: Set filters based on symbols, sectors, and custom parameters.
-- **Multiple Users**: Supporting multiple users while keeping sensitive data secure.
-- **Bot Monitor**: Tracks every stage of the trade process for easy analysis.
-- **Bot Performance**: Track the bot trades performance visually.
-- **Account Tracking**: Displays all open positions and actions in the user account.
-- **Backtesting**: Backtesting the strategy on different stocks, timeframes and trade frequencies.
-- **Django + React Frontend**: A modern user interface for real-time bot monitoring and management.
-- **MySQL Database**: Storing passwords and API keys in a secure manner as well as logging user and bot data.
-- **Dark Mode UI**: Stylish interface with Material-UI (MUI) and a sleek dark theme.
+In the project directory, you can run:
 
----
+### `npm start`
 
-![Easy and Friendly User Dashboard](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard1.jpg)
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-![Monitor the Bot Process and Progress](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard2.jpg)
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
 
-![Keep Track On Your Account](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard3.jpg)
+### `npm test`
 
-![Backtest the Strategy - Get Detailed Graphs](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Backtest1.jpg)
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-![Backtest the Strategy - Get Stats and Insights](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Backtest2.jpg)
+### `npm run build`
 
-![Instructions For Getting Alpaca's API Keys](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/API.jpg)
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-## 📦 Installation
+### `npm run eject`
 
-1. **Clone the Repository:**
-  
-   git clone https://github.com/evya8/golden-scythe-bot.git
-   cd golden-scythe-bot
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-Create and Activate a Virtual Environment (Optional but Recommended):
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-Install Dependencies:
-pip install -r requirements.txt
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
-Install Frontend Dependencies: Navigate to the frontend directory and install dependencies:
-cd frontend
-npm install
+## Learn More
 
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-🚀 Usage
+To learn React, check out the [React documentation](https://reactjs.org/).
 
-Run Backend (Django): Navigate back to the root directory and start the Django server:
-python manage.py runserver
+### Code Splitting
 
-Run Frontend (React): Open another terminal, navigate to the frontend folder, and start the React development server:
-cd frontend
-npm start
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
 
-Activate Your Bot: Once the server is running, login through the UI and toggle the bot activation in the dashboard.
+### Analyzing the Bundle Size
 
-Schedule the Bot: The bot is designed to run during US market hours. Make sure to configure the scheduler in the Django app (AppConfig) to start the bot.
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-🔧 Configuration
+### Making a Progressive Web App
 
-Alpaca API Keys:
-Obtain your API keys from Alpaca.
-Set your API keys securely by saving them to the database. 
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
-Timezone:
-The bot operates in US/Eastern time to align with market hours.
-Ensure uniform time settings across the Django backend and React frontend.
-Display local time for users.
+### Advanced Configuration
 
-📊 Logs & Monitoring
-All bot operations are logged to the database for real-time and historical analysis. You can view:
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-First Screening: Stocks that passed the initial filters.
-Indicator Signals: Buy or sell signals generated by indicators.
-Order Status: Confirmation of executed trades or failure reasons.
+### Deployment
 
-Error Handling
-The bot's performance and errors are tracked in the BotOperations table with detailed status and timestamp logging.
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-🛠️ Development
+### `npm run build` fails to minify
 
-Backend:
-Django for API and logic.
-Django Rest Framework (DRF) for API endpoints.
-JWT Authentication for secure user access.
-
-Frontend:
-React for a responsive, real-time dashboard.
-Material-UI (MUI) for a modern, dark-mode UI.
-Axios for API requests, with token management via interceptors.
-
-📋 Future Improvements
-Implement dynamic grid adjustments based on volatility.
-Add advanced risk management features like trailing stop-loss.
-Incorporate more technical indicators for diversified strategies.
-Mobile app integration for real-time notifications.
-
-📝 License
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-🤝 Contributing
-Contributions are welcome! Feel free to open issues or submit pull requests to improve the bot.
-
-✨ Acknowledgments
-Thanks to Alpaca for providing the API to access stock market data and execute trades in the market.
-Special mention to the developers behind Django, React, and Material-UI for powering the core tech stack.
-vbnet
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)

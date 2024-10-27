@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useContext, useCallback } from 'react';
 import { UserSettingsContext } from '../contexts/UserSettingsContext'; // Import the context where the API keys are stored
+import { Typography } from '@mui/material';
 
 const NewsFeed = () => {
   const [news, setNews] = useState([]);
@@ -52,10 +53,10 @@ const NewsFeed = () => {
       top: '60px',
       width: '240px',
       height: '100vh',
-      backgroundColor: '#333',
+      backgroundColor: '#333', // Dark background
       color: '#fff',
       overflowY: 'auto',
-      padding: '10px',
+      padding: '8px', // Reduced padding for the entire feed
       boxShadow: '-3px 0 5px rgba(0, 0, 0, 0.5)',
       zIndex: 1000,
     },
@@ -65,40 +66,43 @@ const NewsFeed = () => {
       width: '100%',
     },
     newsItem: {
-      padding: '5px', // Reduced padding
-      marginBottom: '10px', // Reduced margin
-      borderRadius: '5px',
-      backgroundColor: '#444',
+      padding: '4px', // Further reduced padding for news items
+      borderRadius: '4px', // Slightly smaller border radius
+      backgroundColor: '#444', // Darker news item background
     },
     headline: {
-      color: '#0099cc',
-      fontSize: '0.85rem', // Reduced font size for the headline
+      color: '#4da6ff', // Lighter blue for headlines for better readability
+      fontSize: '0.8rem', // Slightly smaller font size for the headline
       textDecoration: 'none',
+      fontWeight: 'bold', // Bold text to make the headline stand out
     },
     summary: {
-      fontSize: '0.75rem', // Smaller font for the summary
-      marginTop: '3px', // Reduced margin
+      fontSize: '0.7rem', // Further reduced font for the summary
+      color: '#e0e0e0', // Light text for readability
     },
     source: {
       fontStyle: 'italic',
-      color: '#ccc',
-      fontSize: '0.7rem', // Smaller font for the source
-      marginTop: '3px',
+      color: '#ccc', // Lighter gray for source text
+      fontSize: '0.65rem', // Smaller font for the source
     },
     thumbnail: {
-      width: '100%', // Full width
+      width: '100%', // Full width for the thumbnail
       height: 'auto',
-      borderRadius: '3px', // Smaller border radius
+      borderRadius: '2px', // Smaller border radius for the thumbnail
     },
     hr: {
       borderTop: '1px solid #555',
-      marginTop: '5px', // Reduced margin
+      marginTop: '4px', // Further reduced margin for hr
     },
   };
+  
 
   return (
     <div style={styles.newsFeed}>
       <div className="news-container" style={styles.newsContainer}>
+        <Typography variant="subtitle" textAlign={"center"} gutterBottom color="#f0a500" sx={{ marginBottom: 1, marginTop: 1 }}>
+          News Feed
+        </Typography>
         {apiKeyError ? (
           <p>Error: Missing Alpaca API key or secret.</p>
         ) : loading ? (
@@ -110,7 +114,7 @@ const NewsFeed = () => {
                 src={item.images?.[0]?.url || "https://img.freepik.com/free-vector/people-analyzing-growth-charts_23-2148866843.jpg?t=st=1725960038~exp=1725963638~hmac=ad330f60d343b3e28a42ed2b472e88a6847818422e38d6489c1f7836184d7eef&w=1480"}
                 alt="thumbnail"
                 onError={(e) => {
-                  e.target.onerror = null; 
+                  e.target.onerror = null;
                   e.target.src = "https://img.freepik.com/free-vector/people-analyzing-growth-charts_23-2148866843.jpg?t=st=1725960038~exp=1725963638~hmac=ad330f60d343b3e28a42ed2b472e88a6847818422e38d6489c1f7836184d7eef&w=1480";
                 }}
                 style={styles.thumbnail}

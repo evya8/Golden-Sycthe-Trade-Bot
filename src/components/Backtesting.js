@@ -19,17 +19,32 @@ const Backtesting = () => {
     const { allStocks } = useContext(SymbolsFilterContext); // Fetch allStocks from SymbolsFilterContext
 
     const [formData, setFormData] = useState({
-        tradeFrequency: 'weekly',
+        tradeFrequency: 'low',
         symbol: null, // Single symbol selection
         startDate: '2023-01-02',
         endDate: '2023-06-01',
         totalCapital: 100000,
-        
     });
 
     const darkTheme = createTheme({
         palette: {
             mode: 'dark',
+            primary: {
+                main: '#f0a500', // Gold color for primary elements
+            },
+            background: {
+                default: '#0d0d0d', // Dark background
+                paper: '#1a1a1a', // Slightly lighter for containers
+            },
+            text: {
+                primary: '#e0e0e0', // Off-white text
+            },
+            error: {
+                main: '#ff7043', // Orange-red error color
+            },
+            success: {
+                main: '#66bb6a', // Green for success
+            },
         },
     });
 
@@ -66,22 +81,23 @@ const Backtesting = () => {
         <ThemeProvider theme={darkTheme}>
             <GlobalStyle /> {/* Apply global styles for the calendar icon */}
             <CssBaseline />
+            <Box sx={{marginLeft:9}}>
             <Container>
-                <Typography variant="h4" gutterBottom sx={{ color: '#c9a243' }}>Backtesting</Typography>
+                <Typography variant="h4" gutterBottom sx={{ color: 'primary.main' }}>Backtesting</Typography>
                 <Typography sx={{
-                                marginLeft: 2,
-                                color: '#c9a243',
-                                maxWidth: '300px', // Limit width to wrap text in two lines
-                                textAlign: 'left', // Align the text to the right
-                                fontSize: '1rem', // Keep the font size normal
-                                }}>
-                Expirement with backtesting the strategy and see how it performs.</Typography>
+                    marginLeft: 2,
+                    color: 'text.primary',
+                    maxWidth: '300px',
+                    textAlign: 'left',
+                    fontSize: '1rem',
+                }}>
+                Experiment with backtesting the strategy and see how it performs.
+                </Typography>
 
                 <form onSubmit={handleSubmit}>
                 {/* Container with a maximum width */}
-                <Box sx={{ maxWidth: '500px', p: 2 }}> {/* This ensures a max width and centers the form */}
-                    
-                    <Grid container spacing={2} >
+                <Box sx={{ maxWidth: '500px', p: 2 }}>
+                    <Grid container spacing={2}>
                     
                     {/* Trade Frequency */}
                     <Grid item xs={12}>
@@ -95,9 +111,9 @@ const Backtesting = () => {
                         variant="outlined"
                         margin="normal"
                         >
-                        <MenuItem value="weekly">Weekly</MenuItem>
-                        <MenuItem value="daily">Daily</MenuItem>
-                        <MenuItem value="hourly">Hourly</MenuItem>
+                        <MenuItem value="low">Low</MenuItem>
+                        <MenuItem value="mid">Mid</MenuItem>
+                        <MenuItem value="high">High</MenuItem>
                         </TextField>
                     </Grid>
 
@@ -127,7 +143,7 @@ const Backtesting = () => {
                                 shrink: true,
                             }}
                             InputProps={{
-                                inputProps: { style: { color: 'white' } }, // Optional: Change input text color to white if needed
+                                inputProps: { style: { color: 'white' } },
                             }}
                             variant="outlined"
                             margin="normal"
@@ -147,7 +163,7 @@ const Backtesting = () => {
                                 shrink: true,
                             }}
                             InputProps={{
-                                inputProps: { style: { color: 'white' } }, // Optional: Change input text color to white if needed
+                                inputProps: { style: { color: 'white' } },
                             }}
                             variant="outlined"
                             margin="normal"
@@ -173,17 +189,15 @@ const Backtesting = () => {
                         }}
                         />
                         <Typography sx={{
-                                marginLeft: 0,
-                                color: '#c9a243',
-                                maxWidth: '600px', // Limit width to wrap text in two lines
-                                textAlign: 'left', // Align the text to the right
-                                fontSize: '0.85rem', // Keep the font size normal
-                                }}>
-                With this Backtesting method, each trade employs 100% of your capital.</Typography>
+                            marginLeft: 0,
+                            color: 'text.primary',
+                            maxWidth: '600px',
+                            textAlign: 'left',
+                            fontSize: '0.85rem',
+                        }}>
+                        With this Backtesting method, each trade employs 100% of your capital.
+                        </Typography>
                     </Grid>
-
-                    
-
                     </Grid>
 
                     {/* Submit Button */}
@@ -202,7 +216,7 @@ const Backtesting = () => {
                 )}
 
                 {/* Error Handling */}
-                {error && <Typography color="error">Error: {error}</Typography>}
+                {error && <Typography color="error.main">Error: {error}</Typography>}
 
                 {/* Backtest Result */}
                 {backtestResult && (
@@ -211,6 +225,7 @@ const Backtesting = () => {
                     </Box>
                 )}
             </Container>
+            </Box>
         </ThemeProvider>
     );
 };

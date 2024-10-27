@@ -36,7 +36,7 @@ const Nav = ({ isHomePage }) => {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <AppBar position="fixed" sx={{ zIndex: 1300 }}> {/* Ensure it stays above SideNav */}
+      <AppBar position="fixed" sx={{ zIndex: 1300 }}>
         <Toolbar>
           {/* "Golden Sycthe" Button */}
           <Button
@@ -46,6 +46,7 @@ const Nav = ({ isHomePage }) => {
             sx={{
               fontSize: '1.5rem',
               fontWeight: 'bold',
+              color: '#f0a500', // Gold color for the title
             }}
           >
             Golden Sycthe
@@ -73,7 +74,6 @@ const Nav = ({ isHomePage }) => {
               <LogoutButton />
             </div>
           )}
-          
         </Toolbar>
       </AppBar>
     </ThemeProvider>

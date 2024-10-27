@@ -21,7 +21,20 @@ const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#c9a243', // Custom color for typography and accents
+      main: '#f0a500', // New custom primary color (gold)
+    },
+    background: {
+      default: '#0d0d0d', // Darker background for improved contrast
+      paper: '#1a1a1a', // Slightly lighter paper background
+    },
+    text: {
+      primary: '#e0e0e0', // Off-white text for reduced strain
+    },
+    error: {
+      main: '#ff7043', // New error color (orange-red) to complement success.main
+    },
+    success: {
+      main: '#66bb6a', // Success color
     },
   },
 });
@@ -35,7 +48,6 @@ const formatDate = (dateString) => {
     year: 'numeric',
   }).format(date);
 };
-
 
 const AccountActivity = () => {
   const [activities, setActivities] = useState([]);
@@ -98,8 +110,7 @@ const AccountActivity = () => {
         }
       );
       const activitiesData = await activitiesResponse.json();
-      console.log("Fetched Activities Data:", activitiesData); // Log activities data to the console
-
+      console.log("Fetched Activities Data:", activitiesData);
 
       const positionsResponse = await fetch(
         `https://paper-api.alpaca.markets/v2/positions`,
@@ -111,8 +122,7 @@ const AccountActivity = () => {
         }
       );
       const positionsData = await positionsResponse.json();
-      console.log("Fetched Positions Data:", positionsData); // Log positions data to the console
-
+      console.log("Fetched Positions Data:", positionsData);
 
       setActivities(groupActivitiesBySymbolAndDate(activitiesData));
       setPositions(positionsData);
@@ -134,16 +144,16 @@ const AccountActivity = () => {
       <CssBaseline />
       <Box
         sx={{
-          border: '2px solid #333333',
+          border: '2px solid #404040',
           padding: '20px',
           borderRadius: '4px',
           marginTop: '20px',
         }}
       >
-        <Typography variant="h4" gutterBottom color="#c9a243">
+        <Typography variant="h4" gutterBottom color="primary.main">
           Account Activity
         </Typography>
-        <Typography variant="h6" gutterBottom color="#c9a243">
+        <Typography variant="h6" gutterBottom color="primary.main">
           Open Positions
         </Typography>
 
@@ -159,13 +169,13 @@ const AccountActivity = () => {
             <CircularProgress />
           </Box>
         ) : apiKeyError ? (
-          <Typography color="error" variant="h6">
+          <Typography color="error.main" variant="h6">
             Error: Missing Alpaca API key or secret.
           </Typography>
         ) : (
           <Box>
             {/* Open Positions */}
-            <Paper elevation={3} sx={{ width: '70%', overflow: 'auto', maxHeight: 500, mb: 3 }}>
+            <Paper elevation={3} sx={{ width: '100%', overflow: 'auto', maxHeight: 500, mb: 3 }}>
               <TableContainer>
                 <Table sx={{ minWidth: 650 }} aria-label="open positions table">
                   <TableHead>
@@ -220,10 +230,10 @@ const AccountActivity = () => {
             </Paper>
 
             {/* Trades */}
-            <Typography variant="h6" gutterBottom color="#c9a243">
+            <Typography variant="h6" gutterBottom color="primary.main">
               Activities
             </Typography>
-            <Paper elevation={3} sx={{ width: '70%', overflow: 'auto', maxHeight: 500 }}>
+            <Paper elevation={3} sx={{ width: '100%', overflow: 'auto', maxHeight: 500 }}>
               <TableContainer>
                 <Table sx={{ minWidth: 650 }} aria-label="account activities table">
                   <TableHead sx={{ position: 'sticky' }} >
@@ -255,9 +265,10 @@ const AccountActivity = () => {
                       </TableCell>
                     </TableRow>
                   </TableHead>
-                  <TableBody>
-                    {Object.entries(activities).map(([symbol, dates]) =>
-                      Object.entries(dates).map(([date, data], index) => (
+                  {Object.entries(activities).map(([symbol, dates]) => 
+                    Object.entries(dates)
+                      .sort(([dateA], [dateB]) => new Date(dateB) - new Date(dateA))  // Sort by date
+                      .map(([date, data], index) => (
                         <TableRow key={index} hover>
                           <TableCell>{symbol}</TableCell>
                           <TableCell>{data.side}</TableCell>
@@ -266,8 +277,7 @@ const AccountActivity = () => {
                           <TableCell>{date}</TableCell>
                         </TableRow>
                       ))
-                    )}
-                  </TableBody>
+                  )}
                 </Table>
               </TableContainer>
             </Paper>

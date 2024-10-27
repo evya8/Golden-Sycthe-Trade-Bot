@@ -27,6 +27,12 @@ const Register = () => {
   const darkTheme = createTheme({
     palette: {
       mode: 'dark',
+      primary: {
+        main: '#f0a500', // Gold color for primary elements
+      },
+      text: {
+        primary: '#e0e0e0', // Off-white text for dark mode
+      },
     },
   });
 
@@ -35,11 +41,11 @@ const Register = () => {
       <CssBaseline />
       <Container maxWidth="sm">
         <Box mt={8} textAlign="center">
-          <Typography variant="h5" component="h2" gutterBottom>
+          <Typography variant="h4" component="h2" gutterBottom sx={{ color: 'primary.main'  }}>
             Register
           </Typography>
           <form onSubmit={handleSubmit}>
-            <Box mb={2}>
+            <Box mb={2} sx={{paddingTop:3}}>
               <TextField
                 fullWidth
                 label="First Name"
@@ -48,6 +54,12 @@ const Register = () => {
                 value={formData.first_name}
                 onChange={handleChange}
                 required
+                InputLabelProps={{
+                  style: { color: '#e0e0e0' }, // Off-white label color
+                }}
+                InputProps={{
+                  style: { color: '#e0e0e0' }, // Off-white input text color
+                }}
               />
             </Box>
             <Box mb={2}>
@@ -59,6 +71,12 @@ const Register = () => {
                 value={formData.last_name}
                 onChange={handleChange}
                 required
+                InputLabelProps={{
+                  style: { color: '#e0e0e0' }, // Off-white label color
+                }}
+                InputProps={{
+                  style: { color: '#e0e0e0' }, // Off-white input text color
+                }}
               />
             </Box>
             <Box mb={2}>
@@ -70,6 +88,12 @@ const Register = () => {
                 value={formData.username}
                 onChange={handleChange}
                 required
+                InputLabelProps={{
+                  style: { color: '#e0e0e0' }, // Off-white label color
+                }}
+                InputProps={{
+                  style: { color: '#e0e0e0' }, // Off-white input text color
+                }}
               />
             </Box>
             <Box mb={2}>
@@ -82,6 +106,12 @@ const Register = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                InputLabelProps={{
+                  style: { color: '#e0e0e0' }, // Off-white label color
+                }}
+                InputProps={{
+                  style: { color: '#e0e0e0' }, // Off-white input text color
+                }}
               />
             </Box>
             <Box mb={2}>
@@ -94,6 +124,12 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                InputLabelProps={{
+                  style: { color: '#e0e0e0' }, // Off-white label color
+                }}
+                InputProps={{
+                  style: { color: '#e0e0e0' }, // Off-white input text color
+                }}
               />
             </Box>
             <Button
@@ -102,6 +138,7 @@ const Register = () => {
               color="primary"
               disabled={loading}
               fullWidth
+              sx={{ mt: 2 }}
             >
               Register
             </Button>

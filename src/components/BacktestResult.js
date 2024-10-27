@@ -11,7 +11,6 @@ const BacktestResult = ({ result }) => {
     console.log('Plot Data:', plot_data);     // Logs the plot_data specifically
   }, [result, plot_data]);
 
-  
   // Define the stats to display
   const displayedStats = [
     { key: 'Total Return [%]', label: 'Total Return %' },
@@ -36,33 +35,35 @@ const BacktestResult = ({ result }) => {
 
   return (
     <Box sx={{ padding: 4 }}>
-      <Typography variant="h4" gutterBottom sx={{ color: '#c9a243' }}>Backtest Result</Typography>
+      <Typography variant="h4" gutterBottom sx={{ color: '#f0a500' }}>Backtest Result</Typography>
 
       <Divider sx={{ marginBottom: 4 }} />
 
       {/* Check if plot_data is present and properly formatted before rendering the Plot */}
       {plot_data && plot_data.data && plot_data.layout ? (
-        <Box sx={{ paddingTop: 2 , paddingBottom: 75 }}>
+        <Box sx={{ paddingTop: 2, paddingBottom: 4 }}>
           <Plot
-            data={plot_data.data}    // Plot data must be an array of datasets
-            layout={plot_data.layout} // Plot layout must contain chart configuration
-            style={{ width: '100%', height: '400px' }} // Adjust the size of the chart
+            data={plot_data.data}    // Plot data from backend
+            layout={{
+              ...plot_data.layout
+            }}
+            useResizeHandler={true}    // Enable responsive resizing
           />
         </Box>
       ) : (
-        <Typography variant="body1" color="error">
+        <Typography variant="body1" color="error.main">
           No data available to display the chart. Please check backend response or Plotly configuration.
         </Typography>
       )}
       
       {/* Display Stats - 4 items per row */}
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ paddingRight: 5 }}>
         {displayedStats.map(({ key, label }) => (
           stats[key] !== undefined && (
             <Grid item xs={12} sm={6} md={3} key={key}> {/* 3 columns on medium, 4 columns on large */}
-              <Paper elevation={2} sx={{ padding: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold">{label}</Typography>
-                <Typography variant="body1">
+              <Paper elevation={2} sx={{ padding: 2, backgroundColor: '#1a1a1a' }}> {/* Darker paper */}
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ color: '#e0e0e0' }}>{label}</Typography> {/* Gold label */}
+                <Typography variant="body1" sx={{ color: '#e0e0e0' }}>
                   {typeof stats[key] === 'number' ? stats[key].toLocaleString(undefined, { maximumFractionDigits: 2 }) : stats[key]}
                 </Typography>
               </Paper>
@@ -70,8 +71,6 @@ const BacktestResult = ({ result }) => {
           )
         ))}
       </Grid>
-
-      
     </Box>
   );
 };

@@ -11,7 +11,6 @@ const TopMarketMovers = ({ top = 10 }) => {
   const { alpaca_api_key, alpaca_api_secret } = settings;
   const contentRef = useRef(null);
 
-  // Memoized fetch function using useCallback to avoid recreating it on every render
   const fetchTopMovers = useCallback(async () => {
     if (!alpaca_api_key || !alpaca_api_secret) {
       console.error('Missing Alpaca API key or secret');
@@ -81,18 +80,18 @@ const TopMarketMovers = ({ top = 10 }) => {
 
       setMostActives(mostActivesWithChange);
       setLoading(false);
+
     } catch (error) {
       console.error('Error fetching market data:', error);
       setLoading(false);
     }
-  }, [alpaca_api_key, alpaca_api_secret, top]); // Dependencies for useCallback
+  }, [alpaca_api_key, alpaca_api_secret, top]);
 
-  // Fetch top movers on API key and secret changes
   useEffect(() => {
     if (alpaca_api_key && alpaca_api_secret) {
       fetchTopMovers();
     }
-  }, [fetchTopMovers, alpaca_api_key, alpaca_api_secret]); 
+  }, [fetchTopMovers, alpaca_api_key, alpaca_api_secret]);
 
   useEffect(() => {
     const calculateAnimationSpeed = () => {
@@ -106,6 +105,7 @@ const TopMarketMovers = ({ top = 10 }) => {
 
     calculateAnimationSpeed();
     window.addEventListener('resize', calculateAnimationSpeed);
+
     return () => window.removeEventListener('resize', calculateAnimationSpeed);
   }, [gainers, losers, mostActives]);
 
@@ -115,7 +115,7 @@ const TopMarketMovers = ({ top = 10 }) => {
 
   const renderMoverGroup = (type, movers) => (
     <>
-      <span style={{ margin: '0 10px', fontWeight: 'bold' }}>{type}:</span>
+      <span style={{ margin: '0 10px', fontWeight: 'bold', color: '#e0e0e0' }}>{type}:</span> 
       {movers.map((mover, index) => (
         <span key={index} style={{ margin: '0 7px', color: mover.color }}>
           {mover.symbol}: {mover.percent_change}%{mover.arrow}
@@ -130,9 +130,9 @@ const TopMarketMovers = ({ top = 10 }) => {
         width: '100%',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
-        backgroundColor: '#333',
-        color: '#fff',
-        padding: '10px 0',
+        backgroundColor: '#282828', // Lighter dark background for better contrast
+        color: '#e0e0e0', // Light gray text for better readability
+        padding: '8px 0', // Slightly reduced padding
         position: 'relative',
       }}
     >
@@ -141,7 +141,7 @@ const TopMarketMovers = ({ top = 10 }) => {
         style={{
           display: 'inline-block',
           whiteSpace: 'nowrap',
-          animation: 'scroll-left linear infinite',
+          animation: 'scroll-left linear infinite', // Keep the animation scroll active
         }}
       >
         {/* Render the groups of movers by type */}
@@ -151,16 +151,16 @@ const TopMarketMovers = ({ top = 10 }) => {
               'Most Actives',
               mostActives.map(mover => ({
                 ...mover,
-                color: mover.percent_change >= 0 ? 'green' : 'red',
+                color: mover.percent_change >= 0 ? '#80ff80' : '#ff6666', // Lighter green and red for better readability
               }))
             )}
             {renderMoverGroup(
               'Gainers',
-              gainers.map(mover => ({ ...mover, color: 'green', arrow: '▲' }))
+              gainers.map(mover => ({ ...mover, color: '#80ff80', arrow: '▲' })) // Lighter green
             )}
             {renderMoverGroup(
               'Losers',
-              losers.map(mover => ({ ...mover, color: 'red', arrow: '▼' }))
+              losers.map(mover => ({ ...mover, color: '#ff6666', arrow: '▼' })) // Lighter red
             )}
           </React.Fragment>
         ))}
@@ -169,10 +169,10 @@ const TopMarketMovers = ({ top = 10 }) => {
         {`
           @keyframes scroll-left {
             0% {
-              transform: translateX(100%);
+              transform: translateX(0); /* Start from the current position */
             }
             100% {
-              transform: translateX(-100%);
+              transform: translateX(-100%); /* End off the screen */
             }
           }
         `}

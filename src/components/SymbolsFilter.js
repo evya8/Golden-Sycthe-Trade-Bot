@@ -39,6 +39,7 @@ const SymbolsFilter = () => {
       });
     }
   }, [settings, allStocks]);
+
   const handleSymbolChange = (event, newValue) => {
     setFilters((prevState) => ({
       ...prevState,
@@ -46,6 +47,7 @@ const SymbolsFilter = () => {
       sector: [], // Clear sector if symbol is selected
     }));
   };
+
   const handleSectorChange = (event) => {
     setFilters({
       sector: event.target.value,
@@ -63,21 +65,38 @@ const SymbolsFilter = () => {
     console.log("Filters saved to database:"); // Console log to verify saved filters
   };
   
-
   // Create a dark mode theme
   const darkTheme = createTheme({
     palette: {
       mode: 'dark',
+      primary: {
+        main: '#f0a500', // Gold color for primary elements
+      },
+      text: {
+        primary: '#e0e0e0', // Off-white text for dark mode
+      },
+      background: {
+        default: '#121212',
+        paper: '#1e1e1e',
+      },
     },
   });
 
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', justifyContent: 'space-between' ,border: '2px solid #333333',padding: '20px',borderRadius: '4px',marginTop: '20px'}}>
-        
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        border: '2px solid #333333', 
+        padding: '20px', 
+        borderRadius: '4px',
+        backgroundColor: 'background.paper', 
+        marginTop: '20px' 
+         }}>
+          
         {/* Left side: Filters and Save button */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 , flex: 1}}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
           <FormControl>
             <InputLabel>Sector</InputLabel>
             <Select
@@ -127,13 +146,19 @@ const SymbolsFilter = () => {
             )}
           />
           
-          <Button variant="contained" color="primary" sx={{ alignSelf: 'center' , width: '50%' }} onClick={handleSaveFilters} disabled={false}>
+          <Button
+            variant="contained"
+            color="primary"
+            sx={{ alignSelf: 'center', width: '35%' }}
+            onClick={handleSaveFilters}
+            disabled={false}
+          >
             Save Filters
           </Button>
         </Box>
   
         {/* Right side: Comment */}
-        <Typography sx={{ width: '25%', alignSelf: 'center', marginLeft: 3, color: '#c9a243' }}>
+        <Typography sx={{ width: '25%', alignSelf: 'center', marginLeft: 3 }}>
           Optional filters that will be applied to your bot. You can select sectors or specify stock symbols. 
           If left empty, the bot will screen automatically for stocks suitable for the strategy.
         </Typography>
@@ -141,7 +166,6 @@ const SymbolsFilter = () => {
       </Box>
     </ThemeProvider>
   );
-  
 };
 
 export default SymbolsFilter;

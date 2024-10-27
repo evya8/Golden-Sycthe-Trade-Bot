@@ -1,23 +1,21 @@
 import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
 import axiosInstance from '../utils/axiosInstance';
-import {  toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { setNavigate } from '../utils/axiosInstance';
-
 
 const UserContext = createContext();
 
 const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // Persist the user data in localStorage and restore on refresh (NEW)
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null); // Change: Load user from localStorage
   const [token, setToken] = useState(localStorage.getItem('access_token'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const isRefreshing = useRef(false);  // Use ref to persist across re-renders
-  const refreshSubscribers = useRef([]);  // Use ref for subscribers
-  
+  const isRefreshing = useRef(false);
+  const refreshSubscribers = useRef([]);
 
-  // Notify all subscribers when token is refreshed
   const onRefreshed = (newToken) => {
     refreshSubscribers.current.forEach((callback) => callback(newToken));
     refreshSubscribers.current = [];
@@ -27,7 +25,6 @@ const UserProvider = ({ children }) => {
     refreshSubscribers.current.push(callback);
   };
 
-  // Refresh the access token
   const refreshToken = useCallback(async () => {
     const refreshToken = localStorage.getItem('refresh_token');
 
@@ -49,10 +46,10 @@ const UserProvider = ({ children }) => {
         onRefreshed(newAccessToken);
         return newAccessToken;
       } catch (err) {
-        // If token refresh fails, log out user and redirect
         toast.error('Session expired. Please log in again.');
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');  // NEW: Clear user from localStorage on logout
         setUser(null);
         setToken(null);
         navigate('/login');
@@ -67,42 +64,37 @@ const UserProvider = ({ children }) => {
     });
   }, [navigate]);
 
-  // Axios interceptor to handle token expiration
   useEffect(() => {
     const responseInterceptor = axiosInstance.interceptors.response.use(
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
 
-        // Only refresh token if it's a 401 error and the request hasn't been retried yet
         if (error.response && error.response.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
           try {
-            const newAccessToken = await refreshToken();  // Refresh token and retry request
+            const newAccessToken = await refreshToken();
 
-            // Set new token in the original request and retry it
             originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
             return axiosInstance(originalRequest);
           } catch (err) {
-            return Promise.reject(err);  // Propagate the error if token refresh fails
+            return Promise.reject(err);
           }
         }
 
-        return Promise.reject(error);  // Propagate other errors
+        return Promise.reject(error);
       }
     );
 
-    // Eject the interceptor when the component unmounts
     return () => {
       axiosInstance.interceptors.response.eject(responseInterceptor);
     };
   }, [refreshToken]);
 
   useEffect(() => {
-    setNavigate(navigate);  // Set navigate function for axios
+    setNavigate(navigate);
   }, [navigate]);
 
-  // Listen for changes in token or user and update state accordingly
   useEffect(() => {
     const handleStorageChange = (event) => {
       if (event.key === 'access_token') {
@@ -141,13 +133,14 @@ const UserProvider = ({ children }) => {
       setToken(response.data.access);
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
-     
-      // Fetch user data after getting the token
+      
+      // Fetch user data after login
       const userResponse = await axiosInstance.get('/user/', {
         headers: { Authorization: `Bearer ${response.data.access}` },
       });
-      
-      setUser(userResponse.data);  // Set user in state only
+
+      setUser(userResponse.data);  // Save user data in state
+      localStorage.setItem('user', JSON.stringify(userResponse.data));  // NEW: Persist user in localStorage
       setLoading(false);
       toast.success('Logged in successfully');
       navigate('/user-dashboard');
@@ -165,11 +158,11 @@ const UserProvider = ({ children }) => {
     try {
       await axiosInstance.post('/logout/', { refresh: refreshToken });
     } catch (error) {
-      // Handle logout failure (if the token is invalid or logout request fails)
       toast.error('Logout failed');
     } finally {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');  // NEW: Clear user from localStorage on logout
       setUser(null);
       setToken(null);
       toast.success('You have logged out');
