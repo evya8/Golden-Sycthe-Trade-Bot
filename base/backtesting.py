@@ -135,8 +135,18 @@ def run_backtest(user_id, trade_frequency, symbol, start_date, end_date, total_c
     stats_dict = performance_stats.to_dict()
     safe_stats = {key: safe_float_conversion(value) for key, value in stats_dict.items()}
 
+      
     # Convert Plotly figure to JSON
     portfolio_fig = portfolio.plot()
+    # Modify the layout for dark mode
+    portfolio_fig.update_layout(
+    template="plotly_dark",  # Apply dark mode template
+    paper_bgcolor='#2f2f2f',  # Set background color of the chart area
+    plot_bgcolor='#1a1a1a',   # Set background color inside the chart
+    font=dict(color='beige'),  # Set font color for the chart
+    xaxis=dict(gridcolor='gray'),  # Customize grid color
+    yaxis=dict(gridcolor='gray'),
+)
     plotly_json = json.loads(pio.to_json(portfolio_fig))
 
     # Return backtest stats, equity curve, and Plotly JSON data

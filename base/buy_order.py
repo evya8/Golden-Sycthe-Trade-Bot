@@ -34,42 +34,30 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
             logger.info(f"Processing stock: {stock} for date: {date}")
 
             try:
+                # Check for existing open buy orders for this stock
                 orders = trading_client.get_orders(filter=GetOrdersRequest(
                                                     status=QueryOrderStatus.ALL,
                                                     symbol=stock,
                                                     side=OrderSide.BUY))
 
                 if any(order.status in [OrderStatus.NEW, OrderStatus.PENDING_NEW, OrderStatus.ACCEPTED] for order in orders):
-                    logger.info(f"There are open orders for {stock}. Skipping...")
-                    # Log the failure due to open orders
+                    logger.info(f"There are open buy orders for {stock}. Skipping...")
+                    # Log the failure due to open buy orders
                     BotOperation.objects.create(
                         user=user,
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
-                        reason=f"There is already open buy order for {stock}",
+                        reason=f"There Is Already An Open Buy Order For {stock}",
                         timestamp=timezone.now()
                     )
                     time.sleep(2)
                     continue
 
-                positions = trading_client.get_all_positions()
-                if any(position.symbol == stock for position in positions):
-                    logger.info(f"There is already a position for {stock}. Skipping")
-                    # Log the failure due to existing position
-                    BotOperation.objects.create(
-                        user=user,
-                        stock_symbol=stock,
-                        stage="Order Status",
-                        status="Failed",
-                        reason=f"There is already a position for {stock}",
-                        timestamp=timezone.now()
-                    )
-                    time.sleep(2)
-                    continue
-
+                # Calculate the amount to spend based on the position size
                 amount = round(total_equity * (position_size / 100), 2)
 
+                # Check if buying power is sufficient for the buy order
                 if buying_power < amount:
                     logger.info(f"Not enough buying power to continue. Current buying power: {buying_power}")
                     # Log the failure due to insufficient buying power
@@ -78,13 +66,15 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                         stock_symbol=stock,
                         stage="Order Status",
                         status="Failed",
-                        reason=f"Not enough buying power for {stock}",
+                        reason=f"Not Enough Buying Power For {stock}",
                         timestamp=timezone.now()
                     )
-                    break
+                    break  # Stop processing further buy signals since the buying power is insufficient
 
+                # Generate a unique order ID for tracking
                 client_order_id = str(uuid.uuid4())
 
+                # Submit the buy order
                 trading_client.submit_order(order_data=MarketOrderRequest(
                                             symbol=stock,
                                             notional=amount,
@@ -99,11 +89,12 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                     stock_symbol=stock,
                     stage="Order Status",  
                     status="Passed", 
-                    reason=f"Buy order submitted for {stock}",
+                    reason=f"Buy Order Submitted For {stock}",
                     timestamp=timezone.now()
                 )
                 time.sleep(2)
 
+                # Wait for order status update and handle it accordingly
                 while True:
                     order = trading_client.get_order_by_client_id(client_order_id)
                     if order.status == OrderStatus.FILLED:
@@ -114,33 +105,25 @@ def execute_buy_orders(user, buy_signals, API_KEY, API_SECRET, position_size):
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Passed",  
-                            reason=f"Buy order filled for {stock}",
+                            reason=f"Buy Order Filled For {stock}",
                             timestamp=timezone.now()
                         )
                         time.sleep(2)
                         break
                     elif order.status in [OrderStatus.CANCELED, OrderStatus.REJECTED]:
                         logger.warning(f"Order for {stock} was {order.status}.")
-                        # Log the order rejection/cancellation
+                        # Log the order rejection or cancellation
                         BotOperation.objects.create(
                             user=user,
                             stock_symbol=stock,
                             stage="Order Confirmation",  # Stage: Order Confirmation
                             status="Failed",  
-                            reason=f"Buy order {order.status.lower()} for {stock}",
+                            reason=f"Buy Order {order.status.lower()} for {stock}",
                             timestamp=timezone.now()
                         )
                         break
                     time.sleep(2)
 
             except Exception as e:
-                logger.error(f"Error executing buy order for {stock}: {e}")
-                # Log any errors during the order execution
-                BotOperation.objects.create(
-                    user=user,
-                    stock_symbol=stock,
-                    stage="Order Confirmation",  # Stage: Order Confirmation
-                    status="Failed", 
-                    reason=f"Error executing buy order for {stock}: {e}",
-                    timestamp=timezone.now()
-                )
+                logger.error(f"Error executing buy order for {stock}: {e}")   
+                

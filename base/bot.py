@@ -5,6 +5,7 @@ import time
 from django.utils import timezone
 import traceback
 import json
+from django.core.cache import cache
 
 # Subclass logging.Formatter to use UTC
 class UTCFormatter(logging.Formatter):
@@ -94,7 +95,7 @@ def run_bot(user_id):
                 logger.error(f"User settings for user ID {user_id} not found.")
                 return
             
-            user = settings['user'] 
+            user = settings['user']
 
             logger.info(f"Running bot for user ID: {user_id}. Bot Active: {settings['bot_active']}")
 
@@ -116,7 +117,7 @@ def run_bot(user_id):
             valid_sectors = validate_sectors(filter_sector)
 
             if not valid_symbols and not valid_sectors:
-                logger.info(f"No filters provided from user {user_id} , proceeding to screen stocks")
+                logger.info(f"No filters provided from user {user_id}, proceeding to screen stocks")
                 
 
             from .stochastic_momentum import StochasticMomentumStrategy  # Import moved inside the function
@@ -204,7 +205,6 @@ def run_bot_for_all_users():
             logger.error(f"Error in running bots for users: {e}")
             logger.error(f"Error details: {traceback.format_exc()}")
 
-
 ### Scheduling with APScheduler
 
 def schedule_all_bots():
@@ -234,4 +234,3 @@ def schedule_all_bots():
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown(wait=False)
         logger.info("Scheduler shut down.")
-

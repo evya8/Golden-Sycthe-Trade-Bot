@@ -47,7 +47,7 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                         stock_symbol=stock,
                         stage="Order Status", 
                         status="Failed",  
-                        reason=f"There is already an open sell order for {stock}",
+                        reason=f"There Is Already An Open Sell Order For {stock}",
                         timestamp=timezone.now()
                     )
                     continue
@@ -72,7 +72,7 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                     stock_symbol=stock,
                     stage="Order Status", 
                     status="Passed",  
-                    reason=f"Sell order submitted for {stock}",
+                    reason=f"Sell Order Submitted For {stock}",
                     timestamp=timezone.now()
                 )
 
@@ -94,7 +94,7 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                             stock_symbol=stock,
                             stage="Order Confirmation",  
                             status="Passed",  
-                            reason=f"Sell order filled for {stock}",
+                            reason=f"Sell Order Filled For {stock}",
                             timestamp=timezone.now()
                         )
                         break
@@ -110,18 +110,10 @@ def execute_sell_orders(user, sell_signals, API_KEY, API_SECRET):
                         stock_symbol=stock,
                         stage="Order Confirmation", 
                         status="Failed",  
-                        reason=f"Timeout while waiting for position {stock} to close",
+                        reason=f"Timeout While Waiting For Position {stock} To Close",
                         timestamp=timezone.now()
                     )
 
             except Exception as e:
-                logger.error(f"Error executing sell order for {stock}: {type(e).__name__} - {e}")
-                # Log any errors during the order execution
-                BotOperation.objects.create(
-                    user=user,
-                    stock_symbol=stock,
-                    stage="Order Confirmation", 
-                    status="Failed", 
-                    reason=f"Error executing sell order for {stock}: {type(e).__name__} - {e}",
-                    timestamp=timezone.now()
-                )
+                logger.error(f"Error executing sell order for {stock}: {type(e).__name__} - {e}")  
+                

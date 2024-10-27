@@ -6,7 +6,9 @@ A sophisticated, automated trading bot designed to manage and execute trades bas
 
 - **Automated Trade Execution**: Executes buy and sell orders automatically based on signals.
 - **User-Defined Filters**: Set filters based on symbols, sectors, and custom parameters.
-- **Bot Operations Logging**: Tracks every stage of the trade process for easy analysis.
+- **Multiple Users**: Supporting multiple users while keeping sensitive data secure.
+- **Bot Monitor**: Tracks every stage of the trade process for easy analysis.
+- **Bot Performance**: Track the bot trades performance visually.
 - **Account Tracking**: Displays all open positions and actions in the user account.
 - **Backtesting**: Backtesting the strategy on different stocks, timeframes and trade frequencies.
 - **Django + React Frontend**: A modern user interface for real-time bot monitoring and management.
