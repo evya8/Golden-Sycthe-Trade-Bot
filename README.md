@@ -20,9 +20,11 @@ A sophisticated, automated trading bot designed to manage and execute trades bas
 
 ![Monitor the Bot Process and Progress](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard%20-%20Stock%20Updates%2C%20News%20Feed%2C%20User%20Configurations.png)
 
-![Keep Track On Your Account](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard%20-%20Account.png)
+![Monitor the Bot Process and Progress](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard%20-%20Bot%20Monitor.png)
 
 ![Backtest the Strategy - Get Detailed Graphs](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard%20-%20Bot%20Performance%20Tracking.png)
+
+![Keep Track On Your Account](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Dashboard%20-%20Account.png)
 
 ![Backtest the Strategy - Get Stats and Insights](https://github.com/evya8/Golden-Sycthe-Trade-Bot/blob/master/Screenshots/Backtesting%20-%20User%20Configurations%2C%20Mid%20Frequency.png)
 
