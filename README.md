@@ -2,6 +2,8 @@
 
 A sophisticated, automated trading bot designed to manage and execute trades based on customizable strategy and market data. It integrates with the Alpaca API and features a momentum-based trading strategy.
 
+Video Showcase - https://www.youtube.com/watch?v=PcGJbvUQ9JE
+
 ## 🌟 Features
 
 - **Automated Trade Execution**: Executes buy and sell orders automatically based on signals.
